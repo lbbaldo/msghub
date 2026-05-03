@@ -1,0 +1,23 @@
+.badge {
+  width: fit-content;
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #133f2d;
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.neutral {
+  background: #2b3440;
+  color: #cbd5e1;
+}
+
+.danger {
+  background: #3a1518;
+  color: #fecaca;
+}

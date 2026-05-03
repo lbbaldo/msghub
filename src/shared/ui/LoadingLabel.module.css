@@ -1,0 +1,9 @@
+.icon {
+  animation: hubaiqSpin 0.8s linear infinite;
+}
+
+@keyframes hubaiqSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
