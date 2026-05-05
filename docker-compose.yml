@@ -47,7 +47,7 @@ services:
       retries: 5
 
   evolution-api:
-    image: evoapicloud/evolution-api:v2.3.6
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: hubaiq-evolution-api
     restart: unless-stopped
     extra_hosts:
@@ -88,8 +88,8 @@ services:
       CACHE_LOCAL_ENABLED: false
       CONFIG_SESSION_PHONE_CLIENT: HubAiq
       CONFIG_SESSION_PHONE_NAME: Chrome
-      CONFIG_SESSION_PHONE_VERSION: 2.3000.1015901307
-      BAILEYS_VERSION: 2.3000.1015901307
+      CONFIG_SESSION_PHONE_VERSION: 2.3000.1038736825
+      BAILEYS_VERSION: 2.3000.1038736825
       QRCODE_LIMIT: 30
       LOG_LEVEL: ERROR,WARN,INFO,WEBHOOKS
       LOG_COLOR: true

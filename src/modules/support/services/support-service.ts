@@ -2,20 +2,29 @@ import type { PoolClient, QueryResultRow } from "pg";
 
 import type {
   MessageKind,
+  SupportClientNote,
   SupportMessage,
   SupportTicket,
   TicketStatus,
   TicketWithMessages,
 } from "@/modules/support/types";
-import { mapMessageRow, mapTicketRow } from "@/modules/support/services/mappers";
+import {
+  mapClientNoteRow,
+  mapMessageRow,
+  mapTicketRow,
+} from "@/modules/support/services/mappers";
 import type { EvolutionInboundMessage } from "@/modules/support/services/evolution-webhook";
-import { sendEvolutionTextMessage } from "@/modules/support/services/evolution";
+import {
+  resolveEvolutionContactPhone,
+  sendEvolutionTextMessage,
+} from "@/modules/support/services/evolution";
 import { getSupportSettings } from "@/modules/support/services/settings-service";
 import { getSupportEnv } from "@/shared/config/env";
 import { query, withTransaction } from "@/shared/lib/postgres";
 
 type TicketRow = Parameters<typeof mapTicketRow>[0] & QueryResultRow;
 type MessageRow = Parameters<typeof mapMessageRow>[0] & QueryResultRow;
+type ClientNoteRow = Parameters<typeof mapClientNoteRow>[0] & QueryResultRow;
 
 type AttendantSessionRow = {
   id: string;
@@ -450,12 +459,195 @@ export const listTicketsWithMessages = async (
     [activeTicket.id],
   );
 
+  const messages = messageRows
+    .map(mapMessageRow)
+    .filter((message) => !isFeedbackCommentMessage(activeTicket, message));
+
   return {
     tickets,
     activeTicket,
-    messages: messageRows.map(mapMessageRow),
+    messages,
   };
 };
+
+export const updateTicketInternalNote = async ({
+  ticketId,
+  content,
+  userId,
+}: {
+  ticketId: string;
+  content: string;
+  userId: string;
+}): Promise<SupportTicket> => {
+  const normalizedContent = content.trim();
+  const nextNote = normalizedContent || null;
+  const nextUpdatedAt = nextNote ? new Date().toISOString() : null;
+
+  const rows = await query<TicketRow>(
+    `
+      update public.support_tickets
+      set internal_note = $2,
+          internal_note_updated_at = $3
+      where id = $1
+      returning *
+    `,
+    [ticketId, nextNote, nextUpdatedAt],
+  );
+  const ticket = mapTicketRow(
+    assertRow(rows[0], `Ticket ${ticketId} was not found for internal note update`),
+  );
+
+  await createAuditEvent("support_ticket_internal_note_saved", {
+    actorId: userId,
+    ticketId,
+    contentLength: normalizedContent.length,
+  });
+
+  return ticket;
+};
+
+export const listClientNotes = async (): Promise<SupportClientNote[]> => {
+  const rows = await query<ClientNoteRow>(
+    `
+      select *
+      from public.support_client_notes
+      order by updated_at desc
+    `,
+  );
+
+  return rows.map(mapClientNoteRow);
+};
+
+export const updateClientNote = async ({
+  clientKey,
+  content,
+  userId,
+}: {
+  clientKey: string;
+  content: string;
+  userId: string;
+}): Promise<SupportClientNote | null> => {
+  const normalizedClientKey = clientKey.trim();
+  const normalizedContent = content.trim();
+
+  if (!normalizedClientKey) {
+    throw new Error("Client key is required to save a note");
+  }
+
+  if (!normalizedContent) {
+    await query(
+      `
+        delete from public.support_client_notes
+        where client_key = $1
+      `,
+      [normalizedClientKey],
+    );
+    await createAuditEvent("support_client_note_deleted", {
+      actorId: userId,
+      clientKey: normalizedClientKey,
+    });
+
+    return null;
+  }
+
+  const rows = await query<ClientNoteRow>(
+    `
+      insert into public.support_client_notes (
+        client_key,
+        note,
+        created_by,
+        updated_by
+      )
+      values ($1, $2, $3, $3)
+      on conflict (client_key)
+      do update
+      set note = excluded.note,
+          updated_by = excluded.updated_by
+      returning *
+    `,
+    [normalizedClientKey, normalizedContent, userId],
+  );
+  const note = mapClientNoteRow(
+    assertRow(rows[0], `Client note ${normalizedClientKey} was not saved`),
+  );
+
+  await createAuditEvent("support_client_note_saved", {
+    actorId: userId,
+    clientKey: normalizedClientKey,
+    contentLength: normalizedContent.length,
+  });
+
+  return note;
+};
+
+export const resolveTicketContactPhone = async (
+  ticketId: string,
+): Promise<SupportTicket> => {
+  const ticketRows = await query<TicketRow>(
+    `
+      select *
+      from public.support_tickets
+      where id = $1
+      limit 1
+    `,
+    [ticketId],
+  );
+  const ticket = mapTicketRow(assertRow(ticketRows[0], `Ticket ${ticketId} was not found`));
+
+  if (ticket.customerPhone) {
+    return ticket;
+  }
+
+  const resolvedPhone = await resolveEvolutionContactPhone({
+    customerJid: ticket.customerJid,
+    customerLid: ticket.customerLid,
+  });
+
+  if (!resolvedPhone) {
+    await createAuditEvent("support_contact_phone_not_resolved", {
+      ticketId: ticket.id,
+      customerJid: ticket.customerJid,
+      customerLid: ticket.customerLid,
+    });
+    throw new Error("Ainda não foi possível resolver o telefone desse contato");
+  }
+
+  const updatedRows = await query<TicketRow>(
+    `
+      update public.support_tickets
+      set customer_phone = $2,
+          customer_jid = coalesce(customer_jid, $3)
+      where id = $1
+      returning *
+    `,
+    [ticket.id, resolvedPhone, ticket.customerJid],
+  );
+
+  await createAuditEvent("support_contact_phone_resolved", {
+    ticketId: ticket.id,
+    customerJid: ticket.customerJid,
+    customerLid: ticket.customerLid,
+    customerPhone: resolvedPhone,
+  });
+
+  return mapTicketRow(assertRow(updatedRows[0], "Updated resolved ticket was empty"));
+};
+
+const isSameTimestamp = (firstValue: string, secondValue: string): boolean =>
+  new Date(firstValue).getTime() === new Date(secondValue).getTime();
+
+const isFeedbackCommentMessage = (
+  ticket: SupportTicket,
+  message: SupportMessage,
+): boolean =>
+  Boolean(
+    ticket.feedbackComment &&
+      ticket.feedbackCommentReceivedAt &&
+      message.direction === "recebida" &&
+      message.sentBy === "cliente" &&
+      message.content === ticket.feedbackComment &&
+      isSameTimestamp(message.createdAt, ticket.feedbackCommentReceivedAt),
+  );
 
 const findOpenTicketByIdentity = async (
   client: PoolClient,
@@ -686,19 +878,6 @@ const processFeedbackComment = async (
   const settings = await getSupportSettings();
 
   await withTransaction(async (client) => {
-    await saveMessage(client, {
-      ticketId: ticket.id,
-      direction: "recebida",
-      content: inboundMessage.content,
-      kind: inboundMessage.kind,
-      sentBy: "cliente",
-      attendantId: null,
-      externalMessageId: inboundMessage.externalMessageId,
-      fromMe: false,
-      createdAt: inboundMessage.timestamp,
-      payload: inboundMessage.payload,
-    });
-
     await queryWithClient(
       client,
       `
@@ -1209,6 +1388,7 @@ export const processEvolutionInboundMessage = async (
         message: null,
         messageCreated: false,
         shouldSendQueueConfirmation: false,
+        shouldNotifyAttendants: false,
         shouldProcessFeedback: true,
         shouldProcessFeedbackComment: false,
       };
@@ -1223,6 +1403,7 @@ export const processEvolutionInboundMessage = async (
         message: null,
         messageCreated: false,
         shouldSendQueueConfirmation: false,
+        shouldNotifyAttendants: false,
         shouldProcessFeedback: false,
         shouldProcessFeedbackComment: true,
       };
@@ -1260,6 +1441,7 @@ export const processEvolutionInboundMessage = async (
       message: savedMessage.message,
       messageCreated: savedMessage.created,
       shouldSendQueueConfirmation: ticketCreated || !queueConfirmationSent,
+      shouldNotifyAttendants: ticketCreated,
       shouldProcessFeedback: false,
       shouldProcessFeedbackComment: false,
     };
@@ -1295,7 +1477,7 @@ export const processEvolutionInboundMessage = async (
 
     if (result.ticket.status === "em_atendimento") {
       await forwardCustomerMessageToAssignedAttendant(result.ticket, savedMessage);
-    } else {
+    } else if (result.shouldNotifyAttendants) {
       await sendAttendantNotification(result.ticket, savedMessage);
     }
   }

@@ -60,6 +60,8 @@ export type SupportTicket = {
   feedbackReceivedAt: string | null;
   feedbackComment: string | null;
   feedbackCommentReceivedAt: string | null;
+  internalNote: string | null;
+  internalNoteUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -82,4 +84,13 @@ export type TicketWithMessages = {
   tickets: SupportTicket[];
   activeTicket: SupportTicket | null;
   messages: SupportMessage[];
+};
+
+export type SupportClientNote = {
+  clientKey: string;
+  note: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
 };

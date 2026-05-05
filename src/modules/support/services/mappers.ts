@@ -1,4 +1,8 @@
-import type { SupportMessage, SupportTicket } from "@/modules/support/types";
+import type {
+  SupportClientNote,
+  SupportMessage,
+  SupportTicket,
+} from "@/modules/support/types";
 
 type TicketRow = {
   id: string;
@@ -17,6 +21,8 @@ type TicketRow = {
   feedback_received_at: string | null;
   feedback_comment: string | null;
   feedback_comment_received_at: string | null;
+  internal_note: string | null;
+  internal_note_updated_at: string | null;
   created_at: string;
   updated_at: string;
   closed_at: string | null;
@@ -33,6 +39,15 @@ type MessageRow = {
   external_message_id: string | null;
   from_me: boolean;
   created_at: string;
+};
+
+type ClientNoteRow = {
+  client_key: string;
+  note: string;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export const mapTicketRow = (row: TicketRow): SupportTicket => ({
@@ -52,6 +67,8 @@ export const mapTicketRow = (row: TicketRow): SupportTicket => ({
   feedbackReceivedAt: row.feedback_received_at,
   feedbackComment: row.feedback_comment,
   feedbackCommentReceivedAt: row.feedback_comment_received_at,
+  internalNote: row.internal_note,
+  internalNoteUpdatedAt: row.internal_note_updated_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   closedAt: row.closed_at,
@@ -68,4 +85,13 @@ export const mapMessageRow = (row: MessageRow): SupportMessage => ({
   externalMessageId: row.external_message_id,
   fromMe: row.from_me,
   createdAt: row.created_at,
+});
+
+export const mapClientNoteRow = (row: ClientNoteRow): SupportClientNote => ({
+  clientKey: row.client_key,
+  note: row.note,
+  createdBy: row.created_by,
+  updatedBy: row.updated_by,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
