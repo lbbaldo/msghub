@@ -568,8 +568,8 @@ export const ui = {
     minHeight: 0,
     display: "grid",
     gridTemplateColumns: "230px minmax(0, 1fr)",
-    background: "var(--hub-bg-page)",
-    color: "var(--hub-text)",
+    background: "var(--hub-bg-page, #071016)",
+    color: "var(--hub-text, #f8fafc)",
     overflow: "hidden",
   },
   sidebar: {
@@ -652,6 +652,8 @@ export const ui = {
     display: "grid",
     gridTemplateRows: "76px auto minmax(0, 1fr)",
     padding: "0 var(--hub-space-7) 20px",
+    background: "var(--hub-bg-page, #071016)",
+    color: "var(--hub-text, #f8fafc)",
     overflow: "hidden",
   },
   topbar: {
@@ -660,6 +662,7 @@ export const ui = {
     justifyContent: "space-between",
     gap: "var(--hub-space-6)",
     borderBottom: "1px solid var(--hub-border-muted)",
+    background: "var(--hub-bg-page, #071016)",
   },
   title: {
     fontSize: 24,
@@ -776,6 +779,7 @@ export const ui = {
     justifyContent: "flex-start",
     gap: "var(--hub-space-6)",
     borderBottom: "1px solid var(--hub-border-muted)",
+    background: "var(--hub-bg-page, #071016)",
   },
   filterTab: {
     minHeight: 72,

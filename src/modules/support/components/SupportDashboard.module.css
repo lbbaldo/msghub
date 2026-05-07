@@ -2,8 +2,8 @@
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
-  background: var(--hub-bg-page);
-  color: var(--hub-text);
+  background: var(--hub-bg-page, #071016);
+  color: var(--hub-text, #f8fafc);
 }
 
 .shell *,
@@ -173,6 +173,8 @@
   display: grid;
   grid-template-rows: 76px auto minmax(0, 1fr);
   padding: 0 var(--hub-space-7) 20px;
+  background: var(--hub-bg-page, #071016);
+  color: var(--hub-text, #f8fafc);
 }
 
 .topbar,
@@ -185,6 +187,7 @@
 
 .topbar {
   border-bottom: 1px solid var(--hub-border-muted);
+  background: var(--hub-bg-page, #071016);
 }
 
 .topbar h1 {
@@ -266,6 +269,7 @@
   justify-content: flex-start;
   min-height: 72px;
   border-bottom: 1px solid var(--hub-border-muted);
+  background: var(--hub-bg-page, #071016);
 }
 
 .filterTab {
