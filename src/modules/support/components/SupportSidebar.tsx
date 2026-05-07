@@ -1,4 +1,5 @@
 import { ChevronDown, LogOut } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import type { CurrentUser } from "@/shared/auth/types";
@@ -16,7 +17,6 @@ type SupportSidebarProps = {
   currentUser: CurrentUser;
   isLoggingOut: boolean;
   onLogout: () => void;
-  onSelectView: (view: AppView) => void;
 };
 
 export function SupportSidebar({
@@ -24,7 +24,6 @@ export function SupportSidebar({
   currentUser,
   isLoggingOut,
   onLogout,
-  onSelectView,
 }: SupportSidebarProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -42,18 +41,14 @@ export function SupportSidebar({
           const isActive = item.view === activeView;
 
           return (
-            <button
+            <Link
               key={item.label}
+              href={item.href}
               className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-              onClick={() => {
-                if (item.view) {
-                  onSelectView(item.view);
-                }
-              }}
             >
               <Icon size={18} />
               {item.label}
-            </button>
+            </Link>
           );
         })}
       </nav>

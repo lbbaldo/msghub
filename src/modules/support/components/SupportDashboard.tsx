@@ -12,6 +12,7 @@ import {
   Smile,
   Square,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -77,6 +78,17 @@ import { DropdownField } from "@/shared/ui/DropdownField";
 import { TextField, ToggleField } from "@/shared/ui/FormField";
 import { LoadingLabel } from "@/shared/ui/LoadingLabel";
 
+const appViewPaths: Record<AppView, string> = {
+  atendimentos: "/atendimentos",
+  dashboard: "/dashboard",
+  clientes: "/clientes",
+  mensagens: "/mensagens",
+  relatorios: "/relatorios",
+  integracoes: "/integracoes",
+  usuarios: "/usuarios",
+  configuracoes: "/configuracoes",
+};
+
 const reportPeriodOptions: Array<{ label: string; value: ReportPeriod }> = [
   { label: "Últimos 7 dias", value: "7d" },
   { label: "Últimos 30 dias", value: "30d" },
@@ -141,7 +153,8 @@ const getReportStartDate = (period: ReportPeriod, referenceDate: Date): Date | n
   return startDate;
 };
 
-export function SupportDashboard({ currentUser }: SupportDashboardProps) {
+export function SupportDashboard({ currentUser, initialView }: SupportDashboardProps) {
+  const router = useRouter();
   const [data, setData] = useState<TicketWithMessages>({
     tickets: [],
     contacts: [],
@@ -149,7 +162,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
     messages: [],
   });
   const [filter, setFilter] = useState<TicketFilter>("todos");
-  const [activeView, setActiveView] = useState<AppView>("atendimentos");
+  const activeView = initialView;
   const [query, setQuery] = useState("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
@@ -612,14 +625,14 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
 
   const handleSelectTicket = (ticketId: string) => {
     setIsFinishCategoryOpen(false);
-    setActiveView("atendimentos");
+    router.push(appViewPaths.atendimentos);
     setSelectedTicketId(ticketId);
     void loadTickets(ticketId);
   };
 
   const handleSelectClientTicket = (ticketId: string) => {
     setIsFinishCategoryOpen(false);
-    setActiveView("atendimentos");
+    router.push(appViewPaths.atendimentos);
     setFilter("todos");
     setSelectedTicketId(ticketId);
     void loadTickets(ticketId);
@@ -1172,8 +1185,12 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       ? "Clientes"
       : activeView === "dashboard"
         ? "Dashboard"
+      : activeView === "mensagens"
+        ? "Mensagens"
         : activeView === "relatorios"
           ? "Relatórios"
+        : activeView === "integracoes"
+          ? "Integrações"
         : activeView === "usuarios"
           ? "Usuários"
           : activeView === "configuracoes"
@@ -1184,8 +1201,12 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       ? `${clients.length} clientes no histórico`
       : activeView === "dashboard"
         ? "Operação do suporte em tempo real"
+      : activeView === "mensagens"
+        ? "Modelos e conversas programadas"
         : activeView === "relatorios"
           ? `${reportTickets.length} atendimentos no histórico filtrado`
+        : activeView === "integracoes"
+          ? "Conectores e canais conectados"
         : activeView === "usuarios"
           ? `${users.length} usuários cadastrados`
           : activeView === "configuracoes"
@@ -1196,8 +1217,12 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       ? "Buscar cliente..."
       : activeView === "dashboard"
         ? "Buscar atendimento..."
+      : activeView === "mensagens"
+        ? "Buscar mensagem..."
         : activeView === "relatorios"
           ? "Buscar no histórico..."
+        : activeView === "integracoes"
+          ? "Buscar integração..."
         : activeView === "usuarios"
           ? "Buscar usuário..."
           : activeView === "configuracoes"
@@ -1225,7 +1250,6 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
         currentUser={currentUser}
         isLoggingOut={isMutating}
         onLogout={handleLogout}
-        onSelectView={setActiveView}
       />
 
       <section className={styles.workspace} data-hub-workspace>
@@ -2642,6 +2666,32 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
               </aside>
             </div>
           </>
+        ) : activeView === "mensagens" ? (
+          <div className={styles.dashboardGrid}>
+            <section className={styles.dashboardMain}>
+              <section className={styles.detailCard}>
+                <header>
+                  <h2>Mensagens</h2>
+                </header>
+                <div className={styles.emptyState}>
+                  Os modelos de mensagem e automações de conversa vão ficar nesta página.
+                </div>
+              </section>
+            </section>
+          </div>
+        ) : activeView === "integracoes" ? (
+          <div className={styles.dashboardGrid}>
+            <section className={styles.dashboardMain}>
+              <section className={styles.detailCard}>
+                <header>
+                  <h2>Integrações</h2>
+                </header>
+                <div className={styles.emptyState}>
+                  Os conectores externos vão ficar nesta página.
+                </div>
+              </section>
+            </section>
+          </div>
         ) : (
           <>
             <div className={styles.filterTabs} data-hub-filter-tabs>

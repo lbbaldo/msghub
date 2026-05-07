@@ -1,4 +1,5 @@
 import { BarChart3, MessageCircle, Settings, Store, Users, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type {
   TicketCategory,
   SupportClientNote,
@@ -14,7 +15,9 @@ export type AppView =
   | "atendimentos"
   | "dashboard"
   | "clientes"
+  | "mensagens"
   | "relatorios"
+  | "integracoes"
   | "usuarios"
   | "configuracoes";
 export type ReportPeriod = "7d" | "30d" | "90d" | "todos";
@@ -118,6 +121,7 @@ export type DashboardMetrics = {
 
 export type SupportDashboardProps = {
   currentUser: CurrentUser;
+  initialView: AppView;
 };
 
 export const filters: Array<{ label: string; value: TicketFilter }> = [
@@ -132,17 +136,18 @@ export const filters: Array<{ label: string; value: TicketFilter }> = [
 
 export const sidebarItems: Array<{
   label: string;
-  icon: typeof MessageCircle;
-  view?: AppView;
+  icon: LucideIcon;
+  view: AppView;
+  href: string;
 }> = [
-  { label: "Atendimentos", icon: MessageCircle, view: "atendimentos" },
-  { label: "Dashboard", icon: BarChart3, view: "dashboard" },
-  { label: "Clientes", icon: Users, view: "clientes" },
-  { label: "Relatórios", icon: Store, view: "relatorios" },
-  { label: "Mensagens", icon: MessageCircle },
-  { label: "Configurações", icon: Settings, view: "configuracoes" },
-  { label: "Usuários", icon: Users, view: "usuarios" },
-  { label: "Integrações", icon: Zap },
+  { label: "Atendimentos", icon: MessageCircle, view: "atendimentos", href: "/atendimentos" },
+  { label: "Dashboard", icon: BarChart3, view: "dashboard", href: "/dashboard" },
+  { label: "Clientes", icon: Users, view: "clientes", href: "/clientes" },
+  { label: "Relatórios", icon: Store, view: "relatorios", href: "/relatorios" },
+  { label: "Mensagens", icon: MessageCircle, view: "mensagens", href: "/mensagens" },
+  { label: "Configurações", icon: Settings, view: "configuracoes", href: "/configuracoes" },
+  { label: "Usuários", icon: Users, view: "usuarios", href: "/usuarios" },
+  { label: "Integrações", icon: Zap, view: "integracoes", href: "/integracoes" },
 ];
 
 export const statusLabels: Record<TicketStatus, string> = {
