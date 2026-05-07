@@ -1,0 +1,98 @@
+.dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.trigger {
+  width: 100%;
+  min-height: var(--hub-field-min-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hub-space-3);
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: 0 var(--hub-space-4);
+  background: var(--hub-bg-control);
+  color: var(--hub-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--hub-transition-fast),
+    box-shadow var(--hub-transition-fast),
+    background-color var(--hub-transition-fast);
+}
+
+.trigger:hover:not(:disabled) {
+  border-color: var(--hub-border-hover);
+  background: var(--hub-bg-control-hover);
+}
+
+.trigger:focus-visible {
+  border-color: var(--hub-success);
+  box-shadow: var(--hub-focus-ring);
+  outline: 0;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.trigger svg {
+  flex: 0 0 auto;
+  color: var(--hub-text-muted);
+  transition: transform var(--hub-transition-fast);
+}
+
+.trigger[data-open="true"] svg {
+  transform: rotate(180deg);
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + var(--hub-space-2));
+  left: 0;
+  right: 0;
+  z-index: 120;
+  max-height: 240px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-2);
+  background: var(--hub-bg-panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  overflow-y: auto;
+}
+
+.option {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--hub-radius-sm);
+  padding: 0 var(--hub-space-3);
+  background: transparent;
+  color: var(--hub-text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover,
+.option[data-selected="true"] {
+  background: var(--hub-bg-control-hover);
+  color: var(--hub-text);
+}
+
+.option[data-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--hub-success);
+}

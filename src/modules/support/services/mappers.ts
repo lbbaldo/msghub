@@ -1,5 +1,6 @@
 import type {
   SupportClientNote,
+  SupportContact,
   SupportMessage,
   SupportTicket,
 } from "@/modules/support/types";
@@ -38,12 +39,23 @@ type MessageRow = {
   attendant_id: string | null;
   external_message_id: string | null;
   from_me: boolean;
+  payload: Record<string, unknown>;
   created_at: string;
 };
 
 type ClientNoteRow = {
   client_key: string;
   note: string;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ContactRow = {
+  phone: string;
+  name: string;
+  business_name: string | null;
   created_by: string;
   updated_by: string;
   created_at: string;
@@ -84,12 +96,23 @@ export const mapMessageRow = (row: MessageRow): SupportMessage => ({
   attendantId: row.attendant_id,
   externalMessageId: row.external_message_id,
   fromMe: row.from_me,
+  payload: row.payload,
   createdAt: row.created_at,
 });
 
 export const mapClientNoteRow = (row: ClientNoteRow): SupportClientNote => ({
   clientKey: row.client_key,
   note: row.note,
+  createdBy: row.created_by,
+  updatedBy: row.updated_by,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+export const mapContactRow = (row: ContactRow): SupportContact => ({
+  phone: row.phone,
+  name: row.name,
+  businessName: row.business_name,
   createdBy: row.created_by,
   updatedBy: row.updated_by,
   createdAt: row.created_at,

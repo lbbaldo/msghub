@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { finishTicket } from "@/modules/support/services/support-service";
 import { getCurrentUser } from "@/shared/auth/service";
 
 export const runtime = "nodejs";
 
+const finishTicketSchema = z.object({
+  category: z.enum([
+    "financeiro",
+    "suporte",
+    "pedido",
+    "cadastro",
+    "cardapio",
+    "outro",
+  ]),
+});
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/tickets/[ticketId]/finish">,
 ) {
   const user = await getCurrentUser();
@@ -17,7 +29,11 @@ export async function POST(
 
   const { ticketId } = await context.params;
   try {
-    const ticket = await finishTicket(ticketId);
+    const body = finishTicketSchema.parse(await request.json());
+    const ticket = await finishTicket({
+      ticketId,
+      category: body.category,
+    });
 
     return NextResponse.json({ ticket });
   } catch (caughtError) {

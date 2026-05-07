@@ -19,6 +19,17 @@ export const ticketCategories = [
 
 export type TicketCategory = (typeof ticketCategories)[number];
 
+export const ticketFinishCategories = [
+  "financeiro",
+  "suporte",
+  "pedido",
+  "cadastro",
+  "cardapio",
+  "outro",
+] as const satisfies readonly TicketCategory[];
+
+export type TicketFinishCategory = (typeof ticketFinishCategories)[number];
+
 export const ticketPriorities = ["baixa", "normal", "alta", "urgente"] as const;
 
 export type TicketPriority = (typeof ticketPriorities)[number];
@@ -77,11 +88,13 @@ export type SupportMessage = {
   attendantId: string | null;
   externalMessageId: string | null;
   fromMe: boolean;
+  payload: Record<string, unknown>;
   createdAt: string;
 };
 
 export type TicketWithMessages = {
   tickets: SupportTicket[];
+  contacts: SupportContact[];
   activeTicket: SupportTicket | null;
   messages: SupportMessage[];
 };
@@ -89,6 +102,16 @@ export type TicketWithMessages = {
 export type SupportClientNote = {
   clientKey: string;
   note: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportContact = {
+  phone: string;
+  name: string;
+  businessName: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

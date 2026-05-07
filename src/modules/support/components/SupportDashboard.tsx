@@ -4,19 +4,24 @@ import {
   CheckCircle2,
   ChevronDown,
   ExternalLink,
+  LoaderCircle,
   MessageCircle,
+  Mic,
   Paperclip,
   Send,
   Smile,
-  Zap,
+  Square,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import type {
   SupportMessage,
+  TicketCategory,
+  TicketFinishCategory,
   TicketWithMessages,
 } from "@/modules/support/types";
+import { ticketCategories, ticketFinishCategories } from "@/modules/support/types";
 import { defaultSupportSettings } from "@/modules/support/settings";
 import {
   buildClientSummaries,
@@ -24,9 +29,11 @@ import {
   buildSupportNotifications,
   buildUserDraft,
   canSendToCustomerPhone,
+  type ClientSummary,
   type ClientNoteResponse,
   type ClientNotesResponse,
   filters,
+  formatBrazilianPhone,
   formatDateTime,
   formatDuration,
   formatTime,
@@ -37,7 +44,10 @@ import {
   getTicketIdentity,
   getTicketName,
   getUserPermissions,
+  isTicketVisibleInTodayQueue,
+  maskBrazilianPhoneInput,
   mergeUser,
+  normalizeBrazilianPhone,
   normalizeOptionalPhone,
   requestJson,
   statusLabels,
@@ -48,6 +58,9 @@ import {
   type SettingsView,
   type SupportDashboardProps,
   type SupportNotification,
+  type ReportCategory,
+  type ReportPeriod,
+  type ReportStatus,
   type TicketFilter,
   type TransferTicketsResponse,
   type UserDraft,
@@ -60,12 +73,78 @@ import styles from "@/modules/support/components/SupportDashboard.module.css";
 import type { CurrentUser, SupportUserSummary } from "@/shared/auth/types";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
-import { SelectField, TextField, ToggleField } from "@/shared/ui/FormField";
+import { DropdownField } from "@/shared/ui/DropdownField";
+import { TextField, ToggleField } from "@/shared/ui/FormField";
 import { LoadingLabel } from "@/shared/ui/LoadingLabel";
+
+const reportPeriodOptions: Array<{ label: string; value: ReportPeriod }> = [
+  { label: "Últimos 7 dias", value: "7d" },
+  { label: "Últimos 30 dias", value: "30d" },
+  { label: "Últimos 90 dias", value: "90d" },
+  { label: "Todo o histórico", value: "todos" },
+];
+
+const reportStatusOptions: Array<{ label: string; value: ReportStatus }> = [
+  { label: "Todos os status", value: "todos" },
+  { label: "Em fila", value: "em_fila" },
+  { label: "Em atendimento", value: "em_atendimento" },
+  { label: "Aguardando nota", value: "aguardando_feedback" },
+  { label: "Aguardando comentário", value: "aguardando_feedback_comentario" },
+  { label: "Finalizado", value: "finalizado" },
+];
+
+const categoryLabels: Record<TicketCategory, string> = {
+  financeiro: "Financeiro",
+  suporte: "Suporte",
+  pedido: "Pedido",
+  cadastro: "Cadastro",
+  cardapio: "Cardápio",
+  outro: "Outro",
+};
+
+const reportCategoryOptions: Array<{ label: string; value: ReportCategory }> = [
+  { label: "Todas as categorias", value: "todas" },
+  ...ticketCategories.map((category) => ({
+    label: categoryLabels[category],
+    value: category,
+  })),
+];
+
+const finishCategoryOptions = ticketFinishCategories.map((category) => ({
+  label: categoryLabels[category],
+  value: category,
+}));
+
+const userRoleOptions: Array<{ label: string; value: CurrentUser["role"] }> = [
+  { label: "Atendente", value: "atendente" },
+  { label: "Supervisor", value: "supervisor" },
+  { label: "Admin", value: "admin" },
+];
+
+const getDefaultFinishCategory = (
+  category: TicketCategory | null | undefined,
+): TicketFinishCategory =>
+  ticketFinishCategories.includes(category as TicketFinishCategory)
+    ? (category as TicketFinishCategory)
+    : "suporte";
+
+const getReportStartDate = (period: ReportPeriod, referenceDate: Date): Date | null => {
+  if (period === "todos") {
+    return null;
+  }
+
+  const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+  const startDate = new Date(referenceDate);
+  startDate.setDate(startDate.getDate() - days + 1);
+  startDate.setHours(0, 0, 0, 0);
+
+  return startDate;
+};
 
 export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   const [data, setData] = useState<TicketWithMessages>({
     tickets: [],
+    contacts: [],
     activeTicket: null,
     messages: [],
   });
@@ -74,6 +153,25 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   const [query, setQuery] = useState("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [clientForm, setClientForm] = useState({
+    name: "",
+    businessName: "",
+    phone: "",
+  });
+  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>("30d");
+  const [reportStatus, setReportStatus] = useState<ReportStatus>("todos");
+  const [reportCategory, setReportCategory] = useState<ReportCategory>("todas");
+  const [reportAttendantId, setReportAttendantId] = useState("todos");
+  const [isFinishCategoryOpen, setIsFinishCategoryOpen] = useState(false);
+  const [finishCategory, setFinishCategory] =
+    useState<TicketFinishCategory>("suporte");
+  const [isStartConversationOpen, setIsStartConversationOpen] = useState(false);
+  const [startConversationForm, setStartConversationForm] = useState({
+    customerPhone: "",
+    contactName: "",
+    content: "",
+  });
   const [clientNotes, setClientNotes] = useState<Record<string, string>>({});
   const [users, setUsers] = useState<SupportUserSummary[]>([]);
   const [settings, setSettings] = useState<SettingsView>(defaultSupportSettings);
@@ -95,12 +193,16 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   const [internalNote, setInternalNote] = useState("");
   const [internalNoteTicketId, setInternalNoteTicketId] = useState<string | null>(null);
   const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const audioRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const fetchTickets = useCallback(async (
     ticketId?: string | null,
@@ -247,8 +349,20 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
     });
   }, [data.activeTicket?.id, data.messages.length]);
 
+  useEffect(
+    () => () => {
+      if (audioRecorderRef.current?.state === "recording") {
+        audioRecorderRef.current.stop();
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (activeView !== "usuarios" || users.length > 0 || isUsersLoading) {
+    const shouldLoadUsers =
+      activeView === "usuarios" || activeView === "relatorios";
+
+    if (!shouldLoadUsers || users.length > 0 || isUsersLoading) {
       return;
     }
 
@@ -292,14 +406,18 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
     loadClientNotes,
   ]);
 
+  const ticketsInTodayQueue = useMemo(
+    () => data.tickets.filter((ticket) => isTicketVisibleInTodayQueue(ticket)),
+    [data.tickets],
+  );
   const visibleTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filteredByStatus =
       filter === "todos"
-        ? data.tickets
+        ? ticketsInTodayQueue
         : filter === "urgentes"
-          ? data.tickets.filter((ticket) => ticket.priority === "urgente")
-        : data.tickets.filter((ticket) => ticket.status === filter);
+          ? ticketsInTodayQueue.filter((ticket) => ticket.priority === "urgente")
+        : ticketsInTodayQueue.filter((ticket) => ticket.status === filter);
 
     if (!normalizedQuery) {
       return filteredByStatus;
@@ -317,11 +435,11 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
 
       return searchable.includes(normalizedQuery);
     });
-  }, [data.tickets, filter, query]);
+  }, [filter, query, ticketsInTodayQueue]);
 
   const clients = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const summaries = buildClientSummaries(data.tickets);
+    const summaries = buildClientSummaries(data.tickets, data.contacts);
 
     if (!normalizedQuery) {
       return summaries;
@@ -331,15 +449,15 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       [
         client.name,
         client.identity,
-        client.phone ?? "",
+        formatBrazilianPhone(client.phone),
         client.lid ?? "",
-        client.latestTicket.category ?? "",
+        client.latestTicket?.category ?? "",
       ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedQuery),
     );
-  }, [data.tickets, query]);
+  }, [data.contacts, data.tickets, query]);
 
   const activeClient =
     clients.find((client) => client.key === selectedClientKey) ?? clients[0] ?? null;
@@ -375,6 +493,105 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
     () => new Map(users.map((user) => [user.id, user.name])),
     [users],
   );
+  const reportAttendantOptions = useMemo(
+    () =>
+      Array.from(
+        data.tickets.reduce<Set<string>>((attendantIds, ticket) => {
+          if (!ticket.assignedTo) {
+            return attendantIds;
+          }
+
+          return new Set(attendantIds).add(ticket.assignedTo);
+        }, new Set<string>()),
+      )
+        .map((attendantId) => ({
+          id: attendantId,
+          label: userNameById.get(attendantId) ?? attendantId,
+        }))
+        .sort((firstAttendant, secondAttendant) =>
+          firstAttendant.label.localeCompare(secondAttendant.label),
+        ),
+    [data.tickets, userNameById],
+  );
+  const reportTickets = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const startDate = getReportStartDate(reportPeriod, new Date());
+
+    return data.tickets
+      .filter((ticket) => {
+        const activityDate = new Date(ticket.updatedAt);
+        const matchesPeriod = startDate ? activityDate >= startDate : true;
+        const matchesStatus =
+          reportStatus === "todos" ? true : ticket.status === reportStatus;
+        const matchesCategory =
+          reportCategory === "todas" ? true : ticket.category === reportCategory;
+        const matchesAttendant =
+          reportAttendantId === "todos"
+            ? true
+            : ticket.assignedTo === reportAttendantId;
+        const searchable = [
+          getTicketName(ticket),
+          getTicketIdentity(ticket),
+          ticket.lastMessage ?? "",
+          ticket.category ?? "",
+          ticket.feedbackComment ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        const matchesQuery = normalizedQuery
+          ? searchable.includes(normalizedQuery)
+          : true;
+
+        return (
+          matchesPeriod &&
+          matchesStatus &&
+          matchesCategory &&
+          matchesAttendant &&
+          matchesQuery
+        );
+      })
+      .sort(
+        (firstTicket, secondTicket) =>
+          new Date(secondTicket.updatedAt).getTime() -
+          new Date(firstTicket.updatedAt).getTime(),
+      );
+  }, [
+    data.tickets,
+    query,
+    reportAttendantId,
+    reportCategory,
+    reportPeriod,
+    reportStatus,
+  ]);
+  const reportMetrics = useMemo(
+    () => buildDashboardMetrics(reportTickets),
+    [reportTickets],
+  );
+  const reportOpenTickets = useMemo(
+    () => reportTickets.filter((ticket) => ticket.status !== "finalizado").length,
+    [reportTickets],
+  );
+  const reportFinishedTickets = useMemo(
+    () => reportTickets.filter((ticket) => ticket.status === "finalizado").length,
+    [reportTickets],
+  );
+  const reportStatusRows = useMemo(
+    () =>
+      reportStatusOptions.slice(1).map((statusOption) => ({
+        label: statusOption.label,
+        count: reportTickets.filter((ticket) => ticket.status === statusOption.value)
+          .length,
+      })),
+    [reportTickets],
+  );
+  const reportCategoryRows = useMemo(
+    () =>
+      ticketCategories.map((category) => ({
+        label: categoryLabels[category],
+        count: reportTickets.filter((ticket) => ticket.category === category).length,
+      })),
+    [reportTickets],
+  );
 
   const runMutation = async (operation: () => Promise<void>) => {
     setIsMutating(true);
@@ -394,12 +611,14 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   };
 
   const handleSelectTicket = (ticketId: string) => {
+    setIsFinishCategoryOpen(false);
     setActiveView("atendimentos");
     setSelectedTicketId(ticketId);
     void loadTickets(ticketId);
   };
 
   const handleSelectClientTicket = (ticketId: string) => {
+    setIsFinishCategoryOpen(false);
     setActiveView("atendimentos");
     setFilter("todos");
     setSelectedTicketId(ticketId);
@@ -573,11 +792,102 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       return;
     }
 
+    setFinishCategory(getDefaultFinishCategory(data.activeTicket.category));
+    setIsFinishCategoryOpen(true);
+  };
+
+  const handleConfirmFinish = () => {
+    if (!data.activeTicket) {
+      return;
+    }
+
+    const ticketId = data.activeTicket.id;
+
     void runMutation(async () => {
-      await requestJson(`/api/tickets/${data.activeTicket?.id}/finish`, {
+      await requestJson(`/api/tickets/${ticketId}/finish`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: finishCategory }),
       });
-      await loadTickets(data.activeTicket?.id);
+      setIsFinishCategoryOpen(false);
+      await loadTickets(ticketId);
+    });
+  };
+
+  const handleStartConversation = () => {
+    const customerPhone = normalizeBrazilianPhone(startConversationForm.customerPhone);
+    const content = startConversationForm.content.trim();
+
+    if (!customerPhone || !content) {
+      setError("Informe telefone e mensagem inicial.");
+      return;
+    }
+
+    void runMutation(async () => {
+      const result = await requestJson<{ ticket: { id: string } }>(
+        "/api/tickets",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerPhone,
+            contactName: startConversationForm.contactName.trim() || undefined,
+            content,
+          }),
+        },
+      );
+
+      setStartConversationForm({
+        customerPhone: "",
+        contactName: "",
+        content: "",
+      });
+      setIsStartConversationOpen(false);
+      await loadTickets(result.ticket.id);
+    });
+  };
+
+  const openStartConversationForClient = (client: ClientSummary) => {
+    setStartConversationForm({
+      customerPhone: formatBrazilianPhone(client.phone),
+      contactName: client.name,
+      content: "",
+    });
+    setIsStartConversationOpen(true);
+  };
+
+  const openClientDialog = (client?: ClientSummary) => {
+    setClientForm({
+      name: client?.contactName ?? "",
+      businessName: client?.businessName ?? "",
+      phone: formatBrazilianPhone(client?.phone ?? null),
+    });
+    setIsClientDialogOpen(true);
+  };
+
+  const handleSaveClient = () => {
+    const phone = normalizeBrazilianPhone(clientForm.phone);
+    const name = clientForm.name.trim();
+
+    if (!phone || !name) {
+      setError("Informe nome e telefone do cliente.");
+      return;
+    }
+
+    void runMutation(async () => {
+      await requestJson("/api/clients", {
+        method: selectedClientKey === phone ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone,
+          name,
+          businessName: clientForm.businessName.trim() || undefined,
+        }),
+      });
+      setSelectedClientKey(phone);
+      setIsClientDialogOpen(false);
+      await loadTickets(selectedTicketId);
+      setNotice("Cliente salvo.");
     });
   };
 
@@ -614,6 +924,95 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       setMessage("");
       await loadTickets(data.activeTicket?.id);
     });
+  };
+
+  const sendAudioBlob = (audioBlob: Blob) => {
+    if (!data.activeTicket || audioBlob.size === 0) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "atendimento-audio.webm");
+
+    void runMutation(async () => {
+      await requestJson<{ message: SupportMessage }>(
+        `/api/tickets/${data.activeTicket?.id}/messages`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      await loadTickets(data.activeTicket?.id);
+    });
+  };
+
+  const handleAudioFileChange = (audioFile: File | null) => {
+    if (!audioFile) {
+      return;
+    }
+
+    sendAudioBlob(audioFile);
+  };
+
+  const getAudioRecorderMimeType = (): string | undefined => {
+    const supportedType = [
+      "audio/ogg;codecs=opus",
+      "audio/webm;codecs=opus",
+      "audio/webm",
+    ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+
+    return supportedType;
+  };
+
+  const handleToggleAudioRecording = async () => {
+    if (isRecordingAudio) {
+      audioRecorderRef.current?.stop();
+      setIsRecordingAudio(false);
+      return;
+    }
+
+    if (!data.activeTicket || !canWriteToTicket) {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Este navegador não permite gravar áudio.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = getAudioRecorderMimeType();
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
+
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current = [...audioChunksRef.current, event.data];
+        }
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        audioChunksRef.current = [];
+        sendAudioBlob(audioBlob);
+      };
+      audioRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecordingAudio(true);
+    } catch (caughtError) {
+      const errorMessage =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Não foi possível iniciar a gravação.";
+
+      setError(errorMessage);
+    }
   };
 
   const handleSaveInternalNote = () => {
@@ -773,6 +1172,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       ? "Clientes"
       : activeView === "dashboard"
         ? "Dashboard"
+        : activeView === "relatorios"
+          ? "Relatórios"
         : activeView === "usuarios"
           ? "Usuários"
           : activeView === "configuracoes"
@@ -783,16 +1184,20 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
       ? `${clients.length} clientes no histórico`
       : activeView === "dashboard"
         ? "Operação do suporte em tempo real"
+        : activeView === "relatorios"
+          ? `${reportTickets.length} atendimentos no histórico filtrado`
         : activeView === "usuarios"
           ? `${users.length} usuários cadastrados`
           : activeView === "configuracoes"
             ? "Regras do hub e integrações"
-        : `${data.tickets.length} conversas no hub`;
+        : `${ticketsInTodayQueue.length} conversas no hub`;
   const searchPlaceholder =
     activeView === "clientes"
       ? "Buscar cliente..."
       : activeView === "dashboard"
         ? "Buscar atendimento..."
+        : activeView === "relatorios"
+          ? "Buscar no histórico..."
         : activeView === "usuarios"
           ? "Buscar usuário..."
           : activeView === "configuracoes"
@@ -838,6 +1243,218 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           }
         />
         {alertBanner}
+        {isFinishCategoryOpen && activeTicket ? (
+          <div className={styles.modalBackdrop}>
+            <section
+              className={`${styles.modalDialog} ${styles.modalDialogCompact}`}
+              role="dialog"
+              aria-modal="true"
+            >
+              <header>
+                <h2>Finalizar atendimento</h2>
+                <p className={styles.mutedText}>
+                  Classifique o motivo principal antes de encerrar.
+                </p>
+              </header>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Categoria</span>
+                <DropdownField
+                  value={finishCategory}
+                  onChange={setFinishCategory}
+                  options={finishCategoryOptions}
+                  disabled={isMutating}
+                />
+              </label>
+              <div className={styles.finishCategoryActions}>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => setIsFinishCategoryOpen(false)}
+                  disabled={isMutating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={styles.dangerButton}
+                  onClick={handleConfirmFinish}
+                  disabled={isMutating || !canFinishTicket || !canSendToActiveCustomer}
+                >
+                  <LoadingLabel
+                    isLoading={isMutating}
+                    label="Finalizar"
+                    loadingLabel="Finalizando..."
+                    icon={<CheckCircle2 size={16} />}
+                  />
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {isStartConversationOpen ? (
+          <div className={styles.modalBackdrop}>
+            <section
+              className={`${styles.modalDialog} ${styles.modalDialogForm}`}
+              role="dialog"
+              aria-modal="true"
+            >
+              <header>
+                <h2>Nova conversa</h2>
+                <p className={styles.mutedText}>
+                  Envie a primeira mensagem e crie o atendimento no Hub.
+                </p>
+              </header>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Telefone</span>
+                <TextField
+                  value={startConversationForm.customerPhone}
+                  onChange={(event) =>
+                    setStartConversationForm((currentForm) => ({
+                      ...currentForm,
+                      customerPhone: maskBrazilianPhoneInput(event.target.value),
+                    }))
+                  }
+                  placeholder="(00) 00000-0000"
+                  disabled={isMutating}
+                />
+              </label>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Nome opcional</span>
+                <TextField
+                  value={startConversationForm.contactName}
+                  onChange={(event) =>
+                    setStartConversationForm((currentForm) => ({
+                      ...currentForm,
+                      contactName: event.target.value,
+                    }))
+                  }
+                  placeholder="Nome do cliente"
+                  disabled={isMutating}
+                />
+              </label>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Mensagem inicial</span>
+                <textarea
+                  className={styles.dialogTextarea}
+                  value={startConversationForm.content}
+                  onChange={(event) =>
+                    setStartConversationForm((currentForm) => ({
+                      ...currentForm,
+                      content: event.target.value,
+                    }))
+                  }
+                  placeholder="Digite a primeira mensagem..."
+                  disabled={isMutating}
+                />
+              </label>
+              <div className={styles.finishCategoryActions}>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => setIsStartConversationOpen(false)}
+                  disabled={isMutating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={styles.primaryButton}
+                  onClick={handleStartConversation}
+                  disabled={
+                    isMutating ||
+                    !normalizeBrazilianPhone(startConversationForm.customerPhone) ||
+                    !startConversationForm.content.trim()
+                  }
+                >
+                  <LoadingLabel
+                    isLoading={isMutating}
+                    label="Iniciar"
+                    loadingLabel="Enviando..."
+                    icon={<Send size={16} />}
+                  />
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {isClientDialogOpen ? (
+          <div className={styles.modalBackdrop}>
+            <section
+              className={`${styles.modalDialog} ${styles.modalDialogForm}`}
+              role="dialog"
+              aria-modal="true"
+            >
+              <header>
+                <h2>{selectedClientKey === clientForm.phone ? "Editar cliente" : "Novo cliente"}</h2>
+                <p className={styles.mutedText}>
+                  Salve o contato para usar Clientes como agenda.
+                </p>
+              </header>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Nome</span>
+                <TextField
+                  value={clientForm.name}
+                  onChange={(event) =>
+                    setClientForm((currentForm) => ({
+                      ...currentForm,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder="Nome do cliente"
+                  disabled={isMutating}
+                />
+              </label>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Estabelecimento</span>
+                <TextField
+                  value={clientForm.businessName}
+                  onChange={(event) =>
+                    setClientForm((currentForm) => ({
+                      ...currentForm,
+                      businessName: event.target.value,
+                    }))
+                  }
+                  placeholder="Nome do estabelecimento"
+                  disabled={isMutating}
+                />
+              </label>
+              <label className={styles.formLabel}>
+                <span className={styles.mutedText}>Telefone</span>
+                <TextField
+                  value={clientForm.phone}
+                  onChange={(event) =>
+                    setClientForm((currentForm) => ({
+                      ...currentForm,
+                      phone: maskBrazilianPhoneInput(event.target.value),
+                    }))
+                  }
+                  placeholder="(00) 00000-0000"
+                  disabled={isMutating}
+                />
+              </label>
+              <div className={styles.finishCategoryActions}>
+                <button
+                  className={styles.secondaryButton}
+                  onClick={() => setIsClientDialogOpen(false)}
+                  disabled={isMutating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={styles.primaryButton}
+                  onClick={handleSaveClient}
+                  disabled={
+                    isMutating ||
+                    !clientForm.name.trim() ||
+                    !normalizeBrazilianPhone(clientForm.phone)
+                  }
+                >
+                  <LoadingLabel
+                    isLoading={isMutating}
+                    label="Salvar"
+                    loadingLabel="Salvando..."
+                  />
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         {activeView === "dashboard" ? (
           <>
@@ -849,7 +1466,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
               </button>
               <button className={styles.filterTab}>
                 Tempo real
-                <span>{data.tickets.length}</span>
+                <span>{ticketsInTodayQueue.length}</span>
               </button>
             </div>
             <div className={styles.dashboardGrid}>
@@ -998,7 +1615,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   {filters.map((item) => (
                     <div key={item.value} className={styles.detailRow}>
                       <span>{item.label}</span>
-                      <strong>{getCountForFilter(data.tickets, item.value)}</strong>
+                      <strong>{getCountForFilter(ticketsInTodayQueue, item.value)}</strong>
                     </div>
                   ))}
                 </section>
@@ -1033,6 +1650,198 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       Referência visual usando meta de 30 minutos.
                     </p>
                   </div>
+                </section>
+              </aside>
+            </div>
+          </>
+        ) : activeView === "relatorios" ? (
+          <>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
+              <button className={`${styles.filterTab} ${styles.filterTabActive}`}>
+                Histórico
+              </button>
+              <button className={styles.filterTab}>
+                Registros
+                <span>{reportTickets.length}</span>
+              </button>
+            </div>
+            <div className={styles.reportsGrid}>
+              <section className={styles.dashboardMain}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Filtros do relatório</h2>
+                  </header>
+                  <div className={styles.reportFilters}>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Período</span>
+                      <DropdownField
+                        value={reportPeriod}
+                        onChange={setReportPeriod}
+                        options={reportPeriodOptions}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Status</span>
+                      <DropdownField
+                        value={reportStatus}
+                        onChange={setReportStatus}
+                        options={reportStatusOptions}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Categoria</span>
+                      <DropdownField
+                        value={reportCategory}
+                        onChange={setReportCategory}
+                        options={reportCategoryOptions}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Atendente</span>
+                      <DropdownField
+                        value={reportAttendantId}
+                        onChange={setReportAttendantId}
+                        options={[
+                          { label: "Todos os atendentes", value: "todos" },
+                          ...reportAttendantOptions.map((attendant) => ({
+                            label: attendant.label,
+                            value: attendant.id,
+                          })),
+                        ]}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <div className={styles.dashboardMetrics}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Atendimentos</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {reportTickets.length}
+                    </div>
+                    <p className={styles.mutedText}>Dentro dos filtros atuais</p>
+                  </article>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Finalizados</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {reportFinishedTickets}
+                    </div>
+                    <p className={styles.mutedText}>Encerrados no período filtrado</p>
+                  </article>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Abertos</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {reportOpenTickets}
+                    </div>
+                    <p className={styles.mutedText}>Ainda não finalizados</p>
+                  </article>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Nota média</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {reportMetrics.averageFeedback
+                        ? reportMetrics.averageFeedback.toFixed(1)
+                        : "-"}
+                    </div>
+                    <p className={styles.mutedText}>Feedbacks recebidos</p>
+                  </article>
+                </div>
+
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Histórico de atendimentos</h2>
+                  </header>
+                  <div className={styles.reportList}>
+                    {reportTickets.slice(0, 80).map((ticket) => {
+                      const ticketTone =
+                        ticket.status === "finalizado"
+                          ? "done"
+                          : ticket.status === "em_fila"
+                            ? "queue"
+                            : "active";
+
+                      return (
+                        <button
+                          key={ticket.id}
+                          className={styles.dashboardListButton}
+                          onClick={() => handleSelectTicket(ticket.id)}
+                        >
+                          <div className={`${styles.ticketCode} ${styles[ticketTone]}`}>
+                            {getTicketCode(ticket)}
+                          </div>
+                          <div>
+                            <strong>{getTicketName(ticket)}</strong>
+                            <p className={styles.mutedText}>
+                              {statusLabels[ticket.status]} ·{" "}
+                              {ticket.category
+                                ? categoryLabels[ticket.category]
+                                : "Sem categoria"}{" "}
+                              · {ticket.lastMessage ?? "Sem mensagens"}
+                            </p>
+                          </div>
+                          <span className={styles.mutedText}>
+                            {formatDateTime(ticket.updatedAt)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {reportTickets.length > 80 ? (
+                      <div className={styles.dashboardListItem}>
+                        <span className={styles.mutedText}>
+                          Exibindo 80 de {reportTickets.length} registros. Use os
+                          filtros ou busca para refinar.
+                        </span>
+                      </div>
+                    ) : null}
+                    {reportTickets.length === 0 ? (
+                      <div className={styles.emptyState}>
+                        Nenhum atendimento encontrado para os filtros atuais.
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              </section>
+
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Performance</h2>
+                  </header>
+                  <div className={styles.detailRow}>
+                    <span>Primeira resposta média</span>
+                    <strong>{formatDuration(reportMetrics.averageFirstResponseMs)}</strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>Resolução média</span>
+                    <strong>{formatDuration(reportMetrics.averageResolutionMs)}</strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>Aguardando feedback</span>
+                    <strong>{reportMetrics.waitingFeedback}</strong>
+                  </div>
+                </section>
+
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Por status</h2>
+                  </header>
+                  {reportStatusRows.map((row) => (
+                    <div key={row.label} className={styles.detailRow}>
+                      <span>{row.label}</span>
+                      <strong>{row.count}</strong>
+                    </div>
+                  ))}
+                </section>
+
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Por categoria</h2>
+                  </header>
+                  {reportCategoryRows.map((row) => (
+                    <div key={row.label} className={styles.detailRow}>
+                      <span>{row.label}</span>
+                      <strong>{row.count}</strong>
+                    </div>
+                  ))}
                 </section>
               </aside>
             </div>
@@ -1278,22 +2087,23 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       {runtimeSettings?.webhookConfigured ? "Configurado" : "Pendente"}
                     </Badge>
                   </div>
-                  <Button
-                    fullWidth
-                    className={styles.fullWidthButton}
-                    onClick={() =>
-                      window.open(
-                        runtimeSettings
-                          ? `${runtimeSettings.evolutionApiUrl}/manager`
-                          : "/manager",
-                        "_blank",
-                        "noopener,noreferrer",
-                      )
-                    }
-                  >
-                    Abrir Manager
-                    <ExternalLink size={15} />
-                  </Button>
+                  <div className={styles.detailAction}>
+                    <Button
+                      className={styles.fullWidthButton}
+                      onClick={() =>
+                        window.open(
+                          runtimeSettings
+                            ? `${runtimeSettings.evolutionApiUrl}/manager`
+                            : "/manager",
+                          "_blank",
+                          "noopener,noreferrer",
+                        )
+                      }
+                    >
+                      Abrir Manager
+                      <ExternalLink size={15} />
+                    </Button>
+                  </div>
                 </section>
 
                 <section className={styles.detailCard}>
@@ -1441,23 +2251,23 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       </div>
 
                       <div className={styles.inlineActions}>
-                        <SelectField
+                        <DropdownField
                           value={draft.transferToUserId}
-                          onChange={(event) =>
+                          onChange={(value) =>
                             handleUpdateUserDraft(user.id, {
-                              transferToUserId: event.target.value,
+                              transferToUserId: value,
                             })
                           }
                           disabled={!canTransferTickets || isMutating}
                           className={styles.inlineGrow}
-                        >
-                          <option value="">Transferir tickets para...</option>
-                          {transferableUsers.map((candidateUser) => (
-                            <option key={candidateUser.id} value={candidateUser.id}>
-                              {candidateUser.name}
-                            </option>
-                          ))}
-                        </SelectField>
+                          options={[
+                            { label: "Transferir tickets para...", value: "" },
+                            ...transferableUsers.map((candidateUser) => ({
+                              label: candidateUser.name,
+                              value: candidateUser.id,
+                            })),
+                          ]}
+                        />
                         <Button
                           onClick={() => handleTransferTickets(user)}
                           disabled={
@@ -1552,20 +2362,17 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       placeholder="E-mail"
                       disabled={currentUser.role !== "admin" || isMutating}
                     />
-                    <SelectField
+                    <DropdownField
                       value={createUserForm.role}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setCreateUserForm((currentForm) => ({
                           ...currentForm,
-                          role: event.target.value as CurrentUser["role"],
+                          role: value,
                         }))
                       }
                       disabled={currentUser.role !== "admin" || isMutating}
-                    >
-                      <option value="atendente">Atendente</option>
-                      <option value="supervisor">Supervisor</option>
-                      <option value="admin">Admin</option>
-                    </SelectField>
+                      options={userRoleOptions}
+                    />
                     <TextField
                       value={createUserForm.whatsappPhone}
                       onChange={(event) =>
@@ -1625,6 +2432,12 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 Todos os clientes
                 <span>{clients.length}</span>
               </button>
+              <button
+                className={styles.newConversationButton}
+                onClick={() => openClientDialog()}
+              >
+                Novo cliente
+              </button>
             </div>
 
             <div className={styles.clientsGrid}>
@@ -1645,7 +2458,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       </div>
                       <div>
                         <strong>{client.name}</strong>
-                        <p className={styles.mutedText}>{client.identity}</p>
+                        <p className={styles.mutedText}>
+                          {formatBrazilianPhone(client.phone) || client.identity}
+                        </p>
                         <p className={styles.mutedText}>
                           {client.openTickets} aberto(s) · {client.finishedTickets} finalizado(s)
                         </p>
@@ -1667,9 +2482,27 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       <div className={`${styles.ticketCode} ${styles.active} ${styles.profileAvatar}`}>
                         {getInitial(activeClient.name)}
                       </div>
-                      <div>
+                      <div className={styles.profileHeaderContent}>
                         <h2>{activeClient.name}</h2>
-                        <p className={styles.mutedText}>{activeClient.identity}</p>
+                        <p className={styles.mutedText}>
+                          {formatBrazilianPhone(activeClient.phone) || activeClient.identity}
+                        </p>
+                      </div>
+                      <div className={styles.profileActions}>
+                        <button
+                          className={styles.primaryButton}
+                          onClick={() => openStartConversationForClient(activeClient)}
+                          disabled={!activeClient.phone}
+                        >
+                          <Send size={16} />
+                          Enviar msg
+                        </button>
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => openClientDialog(activeClient)}
+                        >
+                          Editar
+                        </button>
                       </div>
                     </header>
 
@@ -1703,7 +2536,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </header>
                         <div className={styles.detailRow}>
                           <span>Telefone</span>
-                          <strong>{activeClient.phone ?? "Não resolvido"}</strong>
+                          <strong>
+                            {formatBrazilianPhone(activeClient.phone) || "Não resolvido"}
+                          </strong>
                         </div>
                         <div className={styles.detailRow}>
                           <span>LID</span>
@@ -1711,7 +2546,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </div>
                         <div className={styles.detailRow}>
                           <span>Último atendimento</span>
-                          <strong>{formatDateTime(activeClient.latestTicket.updatedAt)}</strong>
+                          <strong>{formatDateTime(activeClient.latestTicket?.updatedAt ?? null)}</strong>
                         </div>
                       </section>
 
@@ -1771,6 +2606,11 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                             </span>
                           </button>
                         ))}
+                        {activeClient.tickets.length === 0 ? (
+                          <div className={styles.emptyState}>
+                            Nenhum atendimento para este cliente.
+                          </div>
+                        ) : null}
                       </section>
                     </div>
                   </>
@@ -1805,18 +2645,25 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
         ) : (
           <>
             <div className={styles.filterTabs} data-hub-filter-tabs>
-          {filters.map((item) => (
-            <button
-              key={item.value}
-              className={`${styles.filterTab} ${
-                filter === item.value ? styles.filterTabActive : ""
-              }`}
-              onClick={() => setFilter(item.value)}
-            >
-              {item.label}
-              <span>{getCountForFilter(data.tickets, item.value)}</span>
-            </button>
-          ))}
+              {filters.map((item) => (
+                <button
+                  key={item.value}
+                  className={`${styles.filterTab} ${
+                    filter === item.value ? styles.filterTabActive : ""
+                  }`}
+                  onClick={() => setFilter(item.value)}
+                >
+                  {item.label}
+                  <span>{getCountForFilter(ticketsInTodayQueue, item.value)}</span>
+                </button>
+              ))}
+              <button
+                className={styles.newConversationButton}
+                onClick={() => setIsStartConversationOpen(true)}
+              >
+                <Send size={16} />
+                Nova conversa
+              </button>
             </div>
 
             <div className={styles.contentGrid} data-hub-content-grid>
@@ -1932,7 +2779,18 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       : styles.messageReceived
                   }`}
                 >
-                  <p>{item.content}</p>
+                  {item.kind === "audio" ? (
+                    <div className={styles.audioMessage}>
+                      <p>{item.content}</p>
+                      <audio
+                        controls
+                        preload="none"
+                        src={`/api/tickets/${item.ticketId}/messages/${item.id}/media`}
+                      />
+                    </div>
+                  ) : (
+                    <p>{item.content}</p>
+                  )}
                   <span className={styles.mutedText}>
                     {item.sentBy} · {formatTime(item.createdAt)}
                   </span>
@@ -1982,23 +2840,53 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                     <button className={styles.iconButton} title="Emoji">
                       <Smile size={18} />
                     </button>
-                    <button className={styles.iconButton} title="Anexar">
+                    <input
+                      ref={audioInputRef}
+                      type="file"
+                      accept="audio/*"
+                      className={styles.hiddenInput}
+                      onChange={(event) => {
+                        handleAudioFileChange(event.target.files?.[0] ?? null);
+                        event.target.value = "";
+                      }}
+                    />
+                    <button
+                      className={styles.iconButton}
+                      title="Anexar áudio"
+                      onClick={() => audioInputRef.current?.click()}
+                      disabled={!canWriteToTicket || isMutating || isRecordingAudio}
+                    >
                       <Paperclip size={18} />
                     </button>
-                    <button className={styles.iconButton} title="Atalhos">
-                      <Zap size={18} />
+                    <button
+                      className={`${styles.iconButton} ${
+                        isRecordingAudio ? styles.recordingButton : ""
+                      }`}
+                      title={isRecordingAudio ? "Parar gravação" : "Gravar áudio"}
+                      onClick={() => {
+                        void handleToggleAudioRecording();
+                      }}
+                      disabled={!canWriteToTicket || isMutating}
+                    >
+                      {isRecordingAudio ? <Square size={16} /> : <Mic size={18} />}
                     </button>
                     <button
-                      className={styles.sendButton}
+                      className={`${styles.sendButton} ${styles.sendIconButton}`}
                       onClick={handleSendMessage}
-                      disabled={!canWriteToTicket || !message.trim() || isMutating}
+                      title="Enviar mensagem"
+                      aria-label="Enviar mensagem"
+                      disabled={
+                        !canWriteToTicket ||
+                        !message.trim() ||
+                        isMutating ||
+                        isRecordingAudio
+                      }
                     >
-                      <LoadingLabel
-                        isLoading={isMutating}
-                        label="Enviar"
-                        loadingLabel="Enviando..."
-                        icon={<Send size={16} />}
-                      />
+                      {isMutating ? (
+                        <LoaderCircle className={styles.loadingIcon} size={18} />
+                      ) : (
+                        <Send size={18} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -2069,7 +2957,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </div>
                   <div className={styles.detailRow}>
                     <span>Telefone</span>
-                    <strong>{activeTicket.customerPhone ?? "Não resolvido"}</strong>
+                    <strong>
+                      {formatBrazilianPhone(activeTicket.customerPhone) || "Não resolvido"}
+                    </strong>
                   </div>
                   <div className={styles.detailRow}>
                     <span>LID</span>
@@ -2121,11 +3011,16 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   <button
                     className={styles.finishButton}
                     onClick={handleFinish}
-                    disabled={isMutating || !canFinishTicket || !canSendToActiveCustomer}
+                    disabled={
+                      isMutating ||
+                      !canFinishTicket ||
+                      !canSendToActiveCustomer ||
+                      isFinishCategoryOpen
+                    }
                   >
                     <LoadingLabel
                       isLoading={isMutating}
-                      label="Finalizar atendimento"
+                      label="Escolher categoria e finalizar"
                       loadingLabel="Finalizando..."
                       icon={<CheckCircle2 size={16} />}
                     />

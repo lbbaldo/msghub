@@ -3,20 +3,26 @@ import type { PoolClient, QueryResultRow } from "pg";
 import type {
   MessageKind,
   SupportClientNote,
+  SupportContact,
   SupportMessage,
   SupportTicket,
+  TicketFinishCategory,
   TicketStatus,
   TicketWithMessages,
 } from "@/modules/support/types";
+import { ticketFinishCategories } from "@/modules/support/types";
 import {
   mapClientNoteRow,
+  mapContactRow,
   mapMessageRow,
   mapTicketRow,
 } from "@/modules/support/services/mappers";
 import type { EvolutionInboundMessage } from "@/modules/support/services/evolution-webhook";
 import {
+  getEvolutionMediaBase64,
   resolveEvolutionContactPhone,
   sendEvolutionTextMessage,
+  sendEvolutionWhatsAppAudio,
 } from "@/modules/support/services/evolution";
 import { getSupportSettings } from "@/modules/support/services/settings-service";
 import { getSupportEnv } from "@/shared/config/env";
@@ -25,6 +31,7 @@ import { query, withTransaction } from "@/shared/lib/postgres";
 type TicketRow = Parameters<typeof mapTicketRow>[0] & QueryResultRow;
 type MessageRow = Parameters<typeof mapMessageRow>[0] & QueryResultRow;
 type ClientNoteRow = Parameters<typeof mapClientNoteRow>[0] & QueryResultRow;
+type ContactRow = Parameters<typeof mapContactRow>[0] & QueryResultRow;
 
 type AttendantSessionRow = {
   id: string;
@@ -69,6 +76,44 @@ type SendAttendantMessageParams = {
   attendantName: string;
 };
 
+type StartConversationParams = {
+  customerPhone: string;
+  contactName: string | null;
+  content: string;
+  attendantId: string;
+  attendantName: string;
+};
+
+type UpsertContactParams = {
+  phone: string;
+  name: string;
+  businessName: string | null;
+  userId: string;
+};
+
+type UpdateContactNameParams = {
+  phone: string;
+  name: string;
+  businessName: string | null;
+  userId: string;
+};
+
+type SendAttendantAudioMessageParams = {
+  ticketId: string;
+  audioBase64: string;
+  attendantId: string;
+};
+
+type FinishTicketParams = {
+  ticketId: string;
+  category: TicketFinishCategory;
+};
+
+type SupportMessageMedia = {
+  base64: string;
+  mimetype: string;
+};
+
 type ProcessEvolutionResult =
   | {
       kind: "ticket_message";
@@ -90,6 +135,23 @@ const openStatuses: TicketStatus[] = [
   "aguardando_feedback",
   "aguardando_feedback_comentario",
 ];
+
+const finishCategoryLabels: Record<TicketFinishCategory, string> = {
+  financeiro: "financeiro",
+  suporte: "suporte",
+  pedido: "pedido",
+  cadastro: "cadastro",
+  cardapio: "cardápio",
+  outro: "outro",
+};
+
+const parseFinishCategory = (content: string): TicketFinishCategory | null => {
+  const normalizedContent = content.trim().toLowerCase();
+
+  return ticketFinishCategories.find((category) =>
+    normalizedContent === `finalizar ${category}`,
+  ) ?? null;
+};
 
 const attendantId = "atendente-whatsapp";
 const botId = "hubaiq-bot";
@@ -145,6 +207,16 @@ const getCustomerPhoneForSend = (ticket: SupportTicket): string => {
   }
 
   return phone;
+};
+
+const normalizeCustomerPhoneForStart = (phone: string): string => {
+  const normalizedPhone = normalizePhone(phone);
+
+  if (normalizedPhone.length < 10 || normalizedPhone.length > 15) {
+    throw new Error("Customer phone must include country code and area code");
+  }
+
+  return normalizedPhone;
 };
 
 const formatAttendantCustomerMessage = (
@@ -477,12 +549,20 @@ export const listTicketsWithMessages = async (
     `,
   );
   const tickets = ticketRows.map(mapTicketRow);
+  const contactRows = await query<ContactRow>(
+    `
+      select *
+      from public.support_contacts
+      order by updated_at desc
+    `,
+  );
+  const contacts = contactRows.map(mapContactRow);
   const activeTicket = activeTicketId
     ? tickets.find((ticket) => ticket.id === activeTicketId) ?? tickets[0] ?? null
     : tickets[0] ?? null;
 
   if (!activeTicket) {
-    return { tickets, activeTicket: null, messages: [] };
+    return { tickets, contacts, activeTicket: null, messages: [] };
   }
 
   const messageRows = await query<MessageRow>(
@@ -501,10 +581,65 @@ export const listTicketsWithMessages = async (
 
   return {
     tickets,
+    contacts,
     activeTicket,
     messages,
   };
 };
+
+export const upsertContact = async ({
+  phone,
+  name,
+  businessName,
+  userId,
+}: UpsertContactParams): Promise<SupportContact> => {
+  const normalizedPhone = normalizeCustomerPhoneForStart(phone);
+  const normalizedName = name.trim();
+  const normalizedBusinessName = businessName?.trim() || null;
+
+  if (!normalizedName) {
+    throw new Error("Contact name is required");
+  }
+
+  const rows = await query<ContactRow>(
+    `
+      insert into public.support_contacts (
+        phone,
+        name,
+        business_name,
+        created_by,
+        updated_by
+      )
+      values ($1, $2, $3, $4, $4)
+      on conflict (phone)
+      do update
+      set name = excluded.name,
+          business_name = excluded.business_name,
+          updated_by = excluded.updated_by
+      returning *
+    `,
+    [normalizedPhone, normalizedName, normalizedBusinessName, userId],
+  );
+
+  await query(
+    `
+      update public.support_tickets
+      set contact_name = $2
+      where customer_phone = $1
+    `,
+    [normalizedPhone, normalizedName],
+  );
+
+  return mapContactRow(assertRow(rows[0], "Contact was not saved"));
+};
+
+export const updateContactName = async ({
+  phone,
+  name,
+  businessName,
+  userId,
+}: UpdateContactNameParams): Promise<SupportContact> =>
+  upsertContact({ phone, name, businessName, userId });
 
 export const updateTicketInternalNote = async ({
   ticketId,
@@ -709,6 +844,26 @@ const findOpenTicketByIdentity = async (
       inboundMessage.customerJid,
       openStatuses,
     ],
+  );
+
+  return rows[0] ? mapTicketRow(rows[0]) : null;
+};
+
+const findOpenTicketByCustomerPhone = async (
+  client: PoolClient,
+  customerPhone: string,
+): Promise<SupportTicket | null> => {
+  const rows = await queryWithClient<TicketRow>(
+    client,
+    `
+      select *
+      from public.support_tickets
+      where customer_phone = $1
+        and status = any($2::public.support_ticket_status[])
+      order by updated_at desc
+      limit 1
+    `,
+    [customerPhone, openStatuses],
   );
 
   return rows[0] ? mapTicketRow(rows[0]) : null;
@@ -1310,16 +1465,33 @@ const processPrivateAttendantSession = async (
     });
   });
 
-  const isFinishCommand = /^FINALIZAR$/iu.test(inboundMessage.content.trim());
+  const isFinishCommand = /^FINALIZAR(?:\s+\S+)?$/iu.test(inboundMessage.content.trim());
 
   if (isFinishCommand) {
-    const ticket = await finishTicket(session.activeTicketId);
+    const category = parseFinishCategory(inboundMessage.content);
+
+    if (!category) {
+      await sendEvolutionTextMessage({
+        phone: attendantPhone,
+        message:
+          "Informe a categoria para finalizar: FINALIZAR FINANCEIRO, FINALIZAR SUPORTE, FINALIZAR PEDIDO, FINALIZAR CADASTRO, FINALIZAR CARDAPIO ou FINALIZAR OUTRO.",
+      });
+
+      return {
+        message: "Finish command requires category",
+      };
+    }
+
+    const ticket = await finishTicket({
+      ticketId: session.activeTicketId,
+      category,
+    });
 
     await withTransaction(async (client) => {
       await clearAttendantSession(client, inboundMessage.senderJid);
     });
 
-    const response = `Atendimento #${getTicketReference(ticket.id)} finalizado. Aguardando feedback do cliente.`;
+    const response = `Atendimento #${getTicketReference(ticket.id)} finalizado como ${finishCategoryLabels[category]}. Aguardando feedback do cliente.`;
 
     await sendEvolutionTextMessage({
       phone: attendantPhone,
@@ -1526,7 +1698,10 @@ export const processEvolutionInboundMessage = async (
       ticket,
       message: savedMessage.message,
       messageCreated: savedMessage.created,
-      shouldSendQueueConfirmation: ticketCreated || !queueConfirmationSent,
+      shouldSendQueueConfirmation:
+        !inboundMessage.fromMe &&
+        ticket.status === "em_fila" &&
+        (ticketCreated || !queueConfirmationSent),
       shouldNotifyAttendants: ticketCreated,
       shouldProcessFeedback: false,
       shouldProcessFeedbackComment: false,
@@ -1616,7 +1791,10 @@ export const assignTicket = async (
   return mapTicketRow(assertRow(rows[0], "Ticket was not found for assignment"));
 };
 
-export const finishTicket = async (ticketId: string): Promise<SupportTicket> => {
+export const finishTicket = async ({
+  ticketId,
+  category,
+}: FinishTicketParams): Promise<SupportTicket> => {
   const ticketRows = await query<TicketRow>(
     `
       select *
@@ -1642,11 +1820,12 @@ export const finishTicket = async (ticketId: string): Promise<SupportTicket> => 
     `
       update public.support_tickets
       set status = 'aguardando_feedback',
+          category = $2,
           closed_at = null
       where id = $1
       returning *
     `,
-    [ticketId],
+    [ticketId, category],
   );
 
   const ticket = mapTicketRow(assertRow(rows[0], "Ticket was not found for finish"));
@@ -1739,6 +1918,209 @@ export const sendAttendantMessage = async ({
 
     return savedMessage.message;
   });
+};
+
+export const startConversation = async ({
+  customerPhone,
+  contactName,
+  content,
+  attendantId,
+  attendantName,
+}: StartConversationParams): Promise<{ ticket: SupportTicket; message: SupportMessage }> => {
+  const normalizedPhone = normalizeCustomerPhoneForStart(customerPhone);
+  const trimmedContent = content.trim();
+  const trimmedContactName = contactName?.trim() || null;
+  const customerMessage = formatAttendantCustomerMessage(attendantName, trimmedContent);
+  const externalMessageId = await sendEvolutionTextMessage({
+    phone: normalizedPhone,
+    message: customerMessage,
+  });
+  const now = new Date().toISOString();
+
+  return withTransaction(async (client) => {
+    if (trimmedContactName) {
+      await queryWithClient(
+        client,
+        `
+          insert into public.support_contacts (
+            phone,
+            name,
+            created_by,
+            updated_by
+          )
+          values ($1, $2, $3, $3)
+          on conflict (phone)
+          do update
+          set name = excluded.name,
+              updated_by = excluded.updated_by
+        `,
+        [normalizedPhone, trimmedContactName, attendantId],
+      );
+    }
+
+    const existingTicket = await findOpenTicketByCustomerPhone(client, normalizedPhone);
+    const ticket = existingTicket
+      ? existingTicket
+      : mapTicketRow(
+          assertRow(
+            (
+              await queryWithClient<TicketRow>(
+                client,
+                `
+                  insert into public.support_tickets (
+                    customer_phone,
+                    contact_name,
+                    status,
+                    assigned_to,
+                    priority,
+                    last_message,
+                    last_message_at,
+                    first_response_at
+                  )
+                  values ($1, $2, 'em_atendimento', $3, 'normal', $4, $5, $5)
+                  returning *
+                `,
+                [
+                  normalizedPhone,
+                  trimmedContactName,
+                  attendantId,
+                  trimmedContent,
+                  now,
+                ],
+              )
+            )[0],
+            "Created ticket was empty",
+          ),
+        );
+
+    const savedMessage = await saveMessage(client, {
+      ticketId: ticket.id,
+      direction: "enviada",
+      content: trimmedContent,
+      kind: "texto",
+      sentBy: "atendente",
+      attendantId,
+      externalMessageId,
+      fromMe: true,
+      createdAt: now,
+    });
+    const updatedRows = await queryWithClient<TicketRow>(
+      client,
+      `
+        update public.support_tickets
+        set contact_name = coalesce($2, contact_name),
+            assigned_to = $3,
+            status = 'em_atendimento',
+            last_message = $4,
+            last_message_at = $5,
+            first_response_at = coalesce(first_response_at, $5)
+        where id = $1
+        returning *
+      `,
+      [ticket.id, trimmedContactName, attendantId, trimmedContent, now],
+    );
+
+    return {
+      ticket: mapTicketRow(assertRow(updatedRows[0], "Updated ticket was empty")),
+      message: savedMessage.message,
+    };
+  });
+};
+
+export const sendAttendantAudioMessage = async ({
+  ticketId,
+  audioBase64,
+  attendantId,
+}: SendAttendantAudioMessageParams): Promise<SupportMessage> => {
+  const ticketRows = await query<TicketRow>(
+    `
+      select *
+      from public.support_tickets
+      where id = $1
+      limit 1
+    `,
+    [ticketId],
+  );
+  const ticket = mapTicketRow(assertRow(ticketRows[0], "Ticket was not found"));
+
+  if (ticket.status !== "em_atendimento") {
+    throw new Error(
+      `Cannot send audio message to ticket ${ticketId} because it is ${ticket.status}`,
+    );
+  }
+
+  const customerPhone = getCustomerPhoneForSend(ticket);
+  const externalMessageId = await sendEvolutionWhatsAppAudio({
+    phone: customerPhone,
+    audioBase64,
+  });
+  const now = new Date().toISOString();
+  const content = "Áudio enviado";
+
+  return withTransaction(async (client) => {
+    const savedMessage = await saveMessage(client, {
+      ticketId,
+      direction: "enviada",
+      content,
+      kind: "audio",
+      sentBy: "atendente",
+      attendantId,
+      externalMessageId,
+      fromMe: true,
+      createdAt: now,
+    });
+    const firstResponseAt = ticket.firstResponseAt ?? now;
+
+    await queryWithClient(
+      client,
+      `
+        update public.support_tickets
+        set last_message = $2,
+            last_message_at = $3,
+            first_response_at = $4,
+            status = $5,
+            assigned_to = $6
+        where id = $1
+      `,
+      [
+        ticketId,
+        content,
+        now,
+        firstResponseAt,
+        ticket.status === "em_fila" ? "em_atendimento" : ticket.status,
+        ticket.assignedTo ?? attendantId,
+      ],
+    );
+
+    return savedMessage.message;
+  });
+};
+
+export const getSupportMessageMedia = async (
+  ticketId: string,
+  messageId: string,
+): Promise<SupportMessageMedia> => {
+  const messageRows = await query<MessageRow>(
+    `
+      select *
+      from public.support_messages
+      where id = $1
+        and ticket_id = $2
+      limit 1
+    `,
+    [messageId, ticketId],
+  );
+  const message = mapMessageRow(assertRow(messageRows[0], "Message was not found"));
+
+  if (message.kind !== "audio") {
+    throw new Error(`Message ${messageId} is not an audio message`);
+  }
+
+  if (!message.externalMessageId) {
+    throw new Error(`Audio message ${messageId} does not have an external id`);
+  }
+
+  return getEvolutionMediaBase64(message.externalMessageId);
 };
 
 export const createAuditEvent = async (

@@ -240,6 +240,21 @@
   cursor: pointer;
 }
 
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.recordingButton {
+  border-color: var(--hub-danger);
+  background: rgba(239, 68, 68, 0.14);
+  color: var(--hub-danger-text);
+}
+
+.hiddenInput {
+  display: none;
+}
+
 .notificationBadge {
   position: absolute;
   top: -7px;
@@ -379,6 +394,23 @@
   color: #bbf7d0;
 }
 
+.newConversationButton {
+  margin-left: auto;
+  min-height: var(--hub-button-min-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hub-space-2);
+  border: 1px solid var(--hub-success-strong);
+  border-radius: var(--hub-radius-md);
+  padding: 0 var(--hub-space-5);
+  background: var(--hub-primary-gradient);
+  color: var(--hub-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .contentGrid {
   min-height: 0;
   display: grid;
@@ -395,6 +427,29 @@
   gap: var(--hub-space-4);
   padding-top: var(--hub-space-5);
   overflow: hidden;
+}
+
+.reportsGrid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--hub-space-4);
+  padding-top: var(--hub-space-5);
+  overflow: hidden;
+}
+
+.reportFilters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: var(--hub-space-3);
+  padding: var(--hub-space-6);
+}
+
+.reportList {
+  max-height: min(520px, calc(100dvh - 460px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .dashboardMain {
@@ -600,16 +655,49 @@
 }
 
 .profileHeader {
+  position: relative;
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: var(--hub-space-5);
   align-items: center;
   padding: var(--hub-space-6);
+  padding-right: min(390px, 42%);
   border-bottom: 1px solid var(--hub-border);
   background: #111a22;
 }
 
+.profileHeaderContent {
+  min-width: 0;
+  display: grid;
+  gap: var(--hub-space-1);
+}
+
+.profileHeaderContent h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileActions {
+  position: absolute;
+  top: 50%;
+  right: var(--hub-space-6);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--hub-space-2);
+  transform: translateY(-50%);
+}
+
+.profileActions button {
+  min-height: 32px;
+  padding: 0 var(--hub-space-4);
+  white-space: nowrap;
+}
+
 .profileAvatar {
+  align-self: center;
   width: 52px;
   height: 52px;
 }
@@ -657,7 +745,7 @@
 
 .formLabel {
   display: grid;
-  gap: 6px;
+  gap: var(--hub-space-2);
   align-content: start;
 }
 
@@ -915,6 +1003,7 @@
 }
 
 .primaryButton,
+.dangerButton,
 .secondaryButton,
 .sendButton,
 .fullWidthButton,
@@ -1009,6 +1098,17 @@
   line-height: 1.45;
 }
 
+.audioMessage {
+  display: grid;
+  gap: var(--hub-space-3);
+  min-width: min(280px, 62vw);
+}
+
+.audioMessage audio {
+  width: 100%;
+  max-width: 320px;
+}
+
 .message span {
   display: block;
   margin-top: 5px;
@@ -1088,6 +1188,13 @@
 
 .composerActions .sendButton {
   margin-left: auto;
+}
+
+.sendIconButton {
+  width: var(--hub-control-min-height);
+  min-width: var(--hub-control-min-height);
+  height: var(--hub-control-min-height);
+  padding: 0;
 }
 
 .detailsColumn {
@@ -1287,12 +1394,98 @@
   color: #bbf7d0;
 }
 
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: var(--hub-space-6);
+  background: rgba(2, 6, 12, 0.68);
+}
+
+.modalDialog {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 48px);
+  display: grid;
+  gap: var(--hub-space-4);
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-6);
+  background: var(--hub-bg-panel);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.modalDialogCompact {
+  width: min(420px, 100%);
+}
+
+.modalDialogForm {
+  width: min(560px, 100%);
+}
+
+.modalDialog header {
+  display: grid;
+  gap: var(--hub-space-2);
+  margin-bottom: var(--hub-space-1);
+}
+
+.modalDialog h2 {
+  font-size: 18px;
+}
+
+.dialogTextarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-5);
+  background: var(--hub-bg-control);
+  color: var(--hub-text);
+  font: inherit;
+  outline: 0;
+  resize: vertical;
+  transition:
+    border-color var(--hub-transition-fast),
+    box-shadow var(--hub-transition-fast),
+    background-color var(--hub-transition-fast);
+}
+
+.dialogTextarea:hover:not(:disabled) {
+  border-color: var(--hub-border-hover);
+  background: var(--hub-bg-control-hover);
+}
+
+.dialogTextarea:focus {
+  border-color: var(--hub-success);
+  box-shadow: var(--hub-focus-ring);
+}
+
+.dialogTextarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.finishCategoryActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--hub-space-2);
+  margin-top: var(--hub-space-1);
+}
+
+.finishCategoryActions button {
+  min-height: var(--hub-field-min-height);
+}
+
 @media (max-width: 1240px) {
   .contentGrid {
     grid-template-columns: 320px minmax(360px, 1fr);
   }
 
-  .dashboardGrid {
+  .dashboardGrid,
+  .reportsGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1356,6 +1549,7 @@
 
   .dashboardMetrics,
   .dashboardTwoColumns,
+  .reportFilters,
   .usersList,
   .clientsGrid,
   .metricGrid {
@@ -1381,5 +1575,18 @@
 
   .testControls {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .profileHeader {
+    padding-right: var(--hub-space-6);
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .profileActions {
+    position: static;
+    grid-column: 2;
+    transform: none;
   }
 }

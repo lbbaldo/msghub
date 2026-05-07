@@ -5,11 +5,21 @@ type EvolutionSendTextParams = {
   message: string;
 };
 
+type EvolutionSendAudioParams = {
+  phone: string;
+  audioBase64: string;
+};
+
 type EvolutionSendResponse = {
   key?: {
     id?: string;
   };
   message?: unknown;
+};
+
+type EvolutionMediaBase64 = {
+  base64: string;
+  mimetype: string;
 };
 
 type EvolutionResolveContactParams = {
@@ -29,6 +39,31 @@ const readString = (record: Record<string, unknown>, key: string): string | null
   const value = record[key];
 
   return typeof value === "string" && value.trim() !== "" ? value : null;
+};
+
+const findStringByKeys = (
+  value: unknown,
+  keys: string[],
+): string | null => {
+  const record = readRecord(value);
+
+  if (!record) {
+    return null;
+  }
+
+  const directValue = keys.reduce<string | null>(
+    (foundValue, key) => foundValue ?? readString(record, key),
+    null,
+  );
+
+  if (directValue) {
+    return directValue;
+  }
+
+  return Object.values(record).reduce<string | null>(
+    (foundValue, nestedValue) => foundValue ?? findStringByKeys(nestedValue, keys),
+    null,
+  );
 };
 
 const normalizePhone = (value: string): string =>
@@ -194,4 +229,74 @@ export const sendEvolutionTextMessage = async ({
   const data = JSON.parse(responseText) as EvolutionSendResponse;
 
   return data.key?.id ?? null;
+};
+
+export const sendEvolutionWhatsAppAudio = async ({
+  phone,
+  audioBase64,
+}: EvolutionSendAudioParams): Promise<string | null> => {
+  const env = getEvolutionEnv();
+  const url = joinUrl(
+    env.evolutionApiUrl,
+    `/message/sendWhatsAppAudio/${env.evolutionInstanceName}`,
+  );
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: env.evolutionApiKey,
+    },
+    body: JSON.stringify({
+      number: phone,
+      audio: audioBase64,
+    }),
+  });
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `Evolution sendWhatsAppAudio failed with status ${response.status}: ${responseText}`,
+    );
+  }
+
+  if (responseText.trim() === "") {
+    return null;
+  }
+
+  const data = JSON.parse(responseText) as EvolutionSendResponse;
+
+  return data.key?.id ?? null;
+};
+
+export const getEvolutionMediaBase64 = async (
+  externalMessageId: string,
+): Promise<EvolutionMediaBase64> => {
+  const env = getEvolutionEnv();
+  const response = await evolutionPostJson<unknown>(
+    `/chat/getBase64FromMediaMessage/${env.evolutionInstanceName}`,
+    {
+      message: {
+        key: {
+          id: externalMessageId,
+        },
+      },
+      convertToMp4: false,
+    },
+  );
+  const base64 = findStringByKeys(response, ["base64", "data", "media", "audio"]);
+  const mimetype =
+    findStringByKeys(response, ["mimetype", "mimeType", "contentType"]) ??
+    "audio/ogg";
+
+  if (!base64) {
+    throw new Error(
+      `Evolution media response did not include base64 for message ${externalMessageId}`,
+    );
+  }
+
+  return {
+    base64: base64.replace(/^data:[^;]+;base64,/u, ""),
+    mimetype,
+  };
 };

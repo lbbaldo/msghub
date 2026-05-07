@@ -170,6 +170,12 @@ const getMessageContent = (
     return imageCaption;
   }
 
+  const audio = message ? getNestedRecord(message, ["audioMessage"]) : null;
+
+  if (audio) {
+    return "Áudio recebido";
+  }
+
   return "[mensagem sem texto]";
 };
 

@@ -1,6 +1,8 @@
 import { BarChart3, MessageCircle, Settings, Store, Users, Zap } from "lucide-react";
 import type {
+  TicketCategory,
   SupportClientNote,
+  SupportContact,
   SupportTicket,
   TicketStatus,
 } from "@/modules/support/types";
@@ -12,22 +14,34 @@ export type AppView =
   | "atendimentos"
   | "dashboard"
   | "clientes"
+  | "relatorios"
   | "usuarios"
   | "configuracoes";
+export type ReportPeriod = "7d" | "30d" | "90d" | "todos";
+export type ReportStatus = "todos" | TicketStatus;
+export type ReportCategory = "todas" | TicketCategory;
 export type SettingsView = SupportSettings;
 
 export type ClientSummary = {
   key: string;
   name: string;
+  contactName: string;
+  businessName: string | null;
   identity: string;
   phone: string | null;
   lid: string | null;
   tickets: SupportTicket[];
-  latestTicket: SupportTicket;
+  latestTicket: SupportTicket | null;
   openTickets: number;
   finishedTickets: number;
   averageFeedback: number | null;
+  updatedAt: string;
 };
+
+const formatClientDisplayName = (
+  name: string,
+  businessName: string | null,
+): string => (businessName ? `${name} - ${businessName}` : name);
 export type UsersResponse = {
   users: SupportUserSummary[];
 };
@@ -124,7 +138,7 @@ export const sidebarItems: Array<{
   { label: "Atendimentos", icon: MessageCircle, view: "atendimentos" },
   { label: "Dashboard", icon: BarChart3, view: "dashboard" },
   { label: "Clientes", icon: Users, view: "clientes" },
-  { label: "Relatórios", icon: Store },
+  { label: "Relatórios", icon: Store, view: "relatorios" },
   { label: "Mensagens", icon: MessageCircle },
   { label: "Configurações", icon: Settings, view: "configuracoes" },
   { label: "Usuários", icon: Users, view: "usuarios" },
@@ -484,6 +498,60 @@ export const normalizeOptionalPhone = (phone: string): string | null => {
   return normalizedPhone.length > 0 ? normalizedPhone : null;
 };
 
+export const normalizeBrazilianPhone = (phone: string): string | null => {
+  const normalizedPhone = normalizeOptionalPhone(phone);
+
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  return normalizedPhone.startsWith("55") ? normalizedPhone : `55${normalizedPhone}`;
+};
+
+export const formatBrazilianPhone = (phone: string | null): string => {
+  if (!phone) {
+    return "";
+  }
+
+  const normalizedPhone = phone.replace(/\D/gu, "");
+  const localPhone =
+    normalizedPhone.startsWith("55") && normalizedPhone.length > 11
+      ? normalizedPhone.slice(2)
+      : normalizedPhone;
+
+  if (localPhone.length === 11) {
+    return `(${localPhone.slice(0, 2)}) ${localPhone.slice(2, 7)}-${localPhone.slice(7)}`;
+  }
+
+  if (localPhone.length === 10) {
+    return `(${localPhone.slice(0, 2)}) ${localPhone.slice(2, 6)}-${localPhone.slice(6)}`;
+  }
+
+  return localPhone;
+};
+
+export const maskBrazilianPhoneInput = (phone: string): string => {
+  const normalizedPhone = phone.replace(/\D/gu, "");
+  const localPhone =
+    normalizedPhone.startsWith("55") && normalizedPhone.length > 11
+      ? normalizedPhone.slice(2, 13)
+      : normalizedPhone.slice(0, 11);
+
+  if (localPhone.length <= 2) {
+    return localPhone;
+  }
+
+  if (localPhone.length <= 6) {
+    return `(${localPhone.slice(0, 2)}) ${localPhone.slice(2)}`;
+  }
+
+  if (localPhone.length <= 10) {
+    return `(${localPhone.slice(0, 2)}) ${localPhone.slice(2, 6)}-${localPhone.slice(6)}`;
+  }
+
+  return `(${localPhone.slice(0, 2)}) ${localPhone.slice(2, 7)}-${localPhone.slice(7)}`;
+};
+
 export const requestJson = async <T,>(
   url: string,
   init?: RequestInit,
@@ -517,44 +585,88 @@ export const getCountForFilter = (
       ? tickets.filter((ticket) => ticket.priority === "urgente").length
       : tickets.filter((ticket) => ticket.status === filter).length;
 
-export const buildClientSummaries = (tickets: SupportTicket[]): ClientSummary[] => {
+const isSameLocalDay = (dateValue: string | null, referenceDate: Date): boolean => {
+  if (!dateValue) {
+    return false;
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return (
+    date.getFullYear() === referenceDate.getFullYear() &&
+    date.getMonth() === referenceDate.getMonth() &&
+    date.getDate() === referenceDate.getDate()
+  );
+};
+
+export const isTicketVisibleInTodayQueue = (
+  ticket: SupportTicket,
+  referenceDate = new Date(),
+): boolean =>
+  ticket.status !== "finalizado" ||
+  isSameLocalDay(ticket.createdAt, referenceDate) ||
+  isSameLocalDay(ticket.updatedAt, referenceDate) ||
+  isSameLocalDay(ticket.lastMessageAt, referenceDate);
+
+export const buildClientSummaries = (
+  tickets: SupportTicket[],
+  contacts: SupportContact[] = [],
+): ClientSummary[] => {
   const groupedTickets = tickets.reduce<Map<string, SupportTicket[]>>((groups, ticket) => {
     const key = getTicketIdentity(ticket);
     const currentTickets = groups.get(key) ?? [];
 
     return new Map(groups).set(key, [...currentTickets, ticket]);
   }, new Map<string, SupportTicket[]>());
+  const groupedContacts = contacts.reduce<Map<string, SupportContact>>(
+    (groups, contact) => new Map(groups).set(contact.phone, contact),
+    new Map<string, SupportContact>(),
+  );
 
-  return Array.from(groupedTickets.entries())
-    .map(([key, clientTickets]) => {
-      const sortedTickets = [...clientTickets].sort(
+  return Array.from(new Set([...groupedTickets.keys(), ...groupedContacts.keys()]))
+    .map((key) => {
+      const ticketsForClient = groupedTickets.get(key) ?? [];
+      const contact = groupedContacts.get(key);
+      const sortedTickets = [...ticketsForClient].sort(
         (firstTicket, secondTicket) =>
           new Date(secondTicket.updatedAt).getTime() -
           new Date(firstTicket.updatedAt).getTime(),
       );
-      const latestTicket = sortedTickets[0] as SupportTicket;
+      const latestTicket = sortedTickets[0] ?? null;
       const feedbackScores = sortedTickets
         .map((ticket) => ticket.feedbackScore)
         .filter((score): score is number => typeof score === "number");
       const feedbackTotal = feedbackScores.reduce((total, score) => total + score, 0);
+      const fallbackIdentity = contact?.phone ?? key;
 
       return {
         key,
-        name: getTicketName(latestTicket),
-        identity: key,
-        phone: latestTicket.customerPhone,
-        lid: latestTicket.customerLid,
+        name: contact
+          ? formatClientDisplayName(contact.name, contact.businessName)
+          : latestTicket
+            ? getTicketName(latestTicket)
+            : fallbackIdentity,
+        contactName: contact?.name ?? (latestTicket ? getTicketName(latestTicket) : fallbackIdentity),
+        businessName: contact?.businessName ?? null,
+        identity: fallbackIdentity,
+        phone: contact?.phone ?? latestTicket?.customerPhone ?? null,
+        lid: latestTicket?.customerLid ?? null,
         tickets: sortedTickets,
         latestTicket,
         openTickets: sortedTickets.filter((ticket) => ticket.status !== "finalizado").length,
         finishedTickets: sortedTickets.filter((ticket) => ticket.status === "finalizado").length,
         averageFeedback:
           feedbackScores.length > 0 ? feedbackTotal / feedbackScores.length : null,
+        updatedAt: latestTicket?.updatedAt ?? contact?.updatedAt ?? new Date(0).toISOString(),
       };
     })
     .sort(
       (firstClient, secondClient) =>
-        new Date(secondClient.latestTicket.updatedAt).getTime() -
-        new Date(firstClient.latestTicket.updatedAt).getTime(),
+        new Date(secondClient.updatedAt).getTime() -
+        new Date(firstClient.updatedAt).getTime(),
     );
 };
