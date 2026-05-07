@@ -255,6 +255,78 @@
   font-weight: 900;
 }
 
+.notificationWrapper {
+  position: relative;
+}
+
+.notificationPanel {
+  position: absolute;
+  top: 54px;
+  right: 0;
+  z-index: 30;
+  width: 380px;
+  max-height: min(520px, calc(100dvh - 110px));
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  background: var(--hub-panel-gradient);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.notificationPanelHeader {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hub-space-4);
+  border-bottom: 1px solid var(--hub-border);
+  padding: 0 var(--hub-space-5);
+}
+
+.notificationList {
+  max-height: calc(min(520px, calc(100dvh - 110px)) - 50px);
+  overflow-y: auto;
+}
+
+.notificationItem {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: var(--hub-space-4);
+  border: 0;
+  border-bottom: 1px solid var(--hub-border-muted);
+  padding: var(--hub-space-5);
+  background: transparent;
+  color: var(--hub-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.notificationTone {
+  width: 8px;
+  min-height: 42px;
+  border-radius: var(--hub-radius-pill);
+  background: #38bdf8;
+}
+
+.notificationToneDanger {
+  background: var(--hub-danger);
+}
+
+.notificationToneWarning {
+  background: #f59e0b;
+}
+
+.notificationText {
+  display: block;
+  margin-top: var(--hub-space-1);
+}
+
+.notificationTime {
+  display: block;
+  margin-top: var(--hub-space-2);
+}
+
 .loadingIcon {
   animation: hubaiqSpin 0.8s linear infinite;
 }
@@ -868,6 +940,17 @@
   background: var(--hub-primary-gradient);
 }
 
+.dangerButton {
+  border-color: #dc2626;
+  background: linear-gradient(180deg, var(--hub-danger), #b91c1c);
+}
+
+.disabledActionButton {
+  border-color: #334155;
+  background: #1f2937;
+  color: var(--hub-text-soft);
+}
+
 .secondaryButton,
 .fullWidthButton,
 .logoutButton {
@@ -880,6 +963,8 @@
 }
 
 .primaryButton:disabled,
+.dangerButton:disabled,
+.disabledActionButton:disabled,
 .secondaryButton:disabled,
 .sendButton:disabled,
 .finishButton:disabled {

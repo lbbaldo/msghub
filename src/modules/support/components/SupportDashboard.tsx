@@ -42,7 +42,6 @@ import {
   requestJson,
   statusLabels,
   statusSections,
-  ui,
   type AppView,
   type CreateUserForm,
   type SettingsResponse,
@@ -752,7 +751,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           label: "Atendimento finalizado",
           loadingLabel: "Atendimento finalizado",
           onClick: () => undefined,
-          style: { ...ui.button, ...ui.disabledActionButton },
+          className: styles.disabledActionButton,
         }
       : activeTicket?.status === "em_atendimento"
       ? {
@@ -760,14 +759,14 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           label: "Finalizar atendimento",
           loadingLabel: "Finalizando...",
           onClick: handleFinish,
-          style: { ...ui.button, ...ui.dangerButton },
+          className: styles.dangerButton,
         }
       : {
           disabled: isMutating || !canAssignTicket,
           label: assignButtonLabel,
           loadingLabel: "Assumindo...",
           onClick: handleAssign,
-          style: { ...ui.button, ...ui.primaryButton },
+          className: styles.primaryButton,
         };
   const pageTitle =
     activeView === "clientes"
@@ -815,7 +814,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   );
 
   return (
-    <main className={styles.shell} style={ui.shell} data-hub-shell>
+    <main className={styles.shell} data-hub-shell>
       <SupportSidebar
         activeView={activeView}
         currentUser={currentUser}
@@ -824,7 +823,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
         onSelectView={setActiveView}
       />
 
-      <section className={styles.workspace} style={ui.workspace} data-hub-workspace>
+      <section className={styles.workspace} data-hub-workspace>
         <SupportTopbar
           isNotificationsOpen={isNotificationsOpen}
           notifications={notifications}
@@ -1358,7 +1357,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   return (
                     <article key={user.id} className={styles.userManagementCard}>
                       <div className={styles.userCardHeader}>
-                        <div style={{ ...ui.userAvatar, width: 44, height: 44 }}>
+                        <div className={styles.userAvatar}>
                           {getInitial(user.name)}
                         </div>
                         <div>
@@ -1891,7 +1890,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </span>
                   <div className={styles.chatActions}>
 	                    <button
-	                      style={mainTicketAction.style}
+	                      className={mainTicketAction.className}
 	                      onClick={mainTicketAction.onClick}
 	                      disabled={mainTicketAction.disabled}
 	                    >

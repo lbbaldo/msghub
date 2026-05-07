@@ -6,7 +6,6 @@ import {
   getInitial,
   sidebarItems,
   statusLabels,
-  ui,
   type AppView,
 } from "@/modules/support/components/SupportDashboard.model";
 import styles from "@/modules/support/components/SupportDashboard.module.css";
@@ -30,13 +29,12 @@ export function SupportSidebar({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   return (
-    <aside className={styles.sidebar} style={ui.sidebar} data-hub-sidebar>
-      <div className={styles.logo} style={ui.logo}>
+    <aside className={styles.sidebar} data-hub-sidebar>
+      <div className={styles.logo}>
         aiqfome
       </div>
       <nav
         className={styles.navigation}
-        style={ui.navigation}
         aria-label="Menu principal"
       >
         {sidebarItems.map((item) => {
@@ -47,7 +45,6 @@ export function SupportSidebar({
             <button
               key={item.label}
               className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-              style={{ ...ui.navItem, ...(isActive ? ui.navItemActive : {}) }}
               onClick={() => {
                 if (item.view) {
                   onSelectView(item.view);
@@ -79,17 +76,16 @@ export function SupportSidebar({
         ) : null}
         <button
           className={styles.userCard}
-          style={ui.userCard}
           onClick={() => setIsUserMenuOpen((currentValue) => !currentValue)}
           aria-expanded={isUserMenuOpen}
           aria-haspopup="menu"
         >
-          <div className={styles.userAvatar} style={ui.userAvatar}>
+          <div className={styles.userAvatar}>
             {getInitial(currentUser.name)}
           </div>
           <div>
             <strong>{currentUser.name}</strong>
-            <span style={ui.mutedText}>{statusLabels.em_atendimento}</span>
+            <span>{statusLabels.em_atendimento}</span>
           </div>
           <ChevronDown
             className={isUserMenuOpen ? styles.sidebarUserChevronOpen : ""}

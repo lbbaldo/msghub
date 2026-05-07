@@ -2,7 +2,6 @@ import { Bell, Search, SlidersHorizontal } from "lucide-react";
 
 import {
   formatDateTime,
-  ui,
   type SupportNotification,
 } from "@/modules/support/components/SupportDashboard.model";
 import styles from "@/modules/support/components/SupportDashboard.module.css";
@@ -31,77 +30,75 @@ export function SupportTopbar({
   onToggleNotifications,
 }: SupportTopbarProps) {
   return (
-    <header className={styles.topbar} style={ui.topbar} data-hub-topbar>
+    <header className={styles.topbar} data-hub-topbar>
       <div>
-        <h1 style={ui.title}>{pageTitle}</h1>
-        <p style={ui.mutedText}>{pageSubtitle}</p>
+        <h1>{pageTitle}</h1>
+        <p>{pageSubtitle}</p>
       </div>
-      <div className={styles.topbarActions} style={ui.topbarActions}>
-        <label className={styles.searchBox} style={ui.searchBox}>
+      <div className={styles.topbarActions}>
+        <label className={styles.searchBox}>
           <Search size={18} />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={searchPlaceholder}
-            style={ui.searchInput}
           />
         </label>
-        <button className={styles.iconButton} style={ui.iconButton} title="Filtros">
+        <button className={styles.iconButton} title="Filtros">
           <SlidersHorizontal size={18} />
         </button>
-        <div style={ui.notificationWrapper}>
+        <div className={styles.notificationWrapper}>
           <button
             className={styles.iconButton}
-            style={ui.iconButton}
             title="Notificações"
             onClick={onToggleNotifications}
           >
             <Bell size={18} />
             {notifications.length > 0 ? (
-              <span className={styles.notificationBadge} style={ui.badge}>
+              <span className={styles.notificationBadge}>
                 {notifications.length}
               </span>
             ) : null}
           </button>
           {isNotificationsOpen ? (
-            <section style={ui.notificationPanel}>
-              <header style={ui.notificationPanelHeader}>
+            <section className={styles.notificationPanel}>
+              <header className={styles.notificationPanelHeader}>
                 <strong>Avisos</strong>
-                <span style={ui.mutedText}>
+                <span className={styles.mutedText}>
                   {notifications.length} pendência(s)
                 </span>
               </header>
-              <div style={ui.notificationList}>
+              <div className={styles.notificationList}>
                 {notifications.map((notification) => (
                   <button
                     key={notification.id}
-                    style={ui.notificationItem}
+                    className={styles.notificationItem}
                     onClick={() => onSelectNotification(notification)}
                   >
                     <span
-                      style={{
-                        ...ui.notificationTone,
-                        ...(notification.tone === "danger"
-                          ? ui.notificationToneDanger
-                          : {}),
-                        ...(notification.tone === "warning"
-                          ? ui.notificationToneWarning
-                          : {}),
-                      }}
+                      className={`${styles.notificationTone} ${
+                        notification.tone === "danger"
+                          ? styles.notificationToneDanger
+                          : ""
+                      } ${
+                        notification.tone === "warning"
+                          ? styles.notificationToneWarning
+                          : ""
+                      }`}
                     />
                     <span>
                       <strong>{notification.title}</strong>
-                      <p style={{ ...ui.mutedText, marginTop: 4 }}>
+                      <p className={`${styles.mutedText} ${styles.notificationText}`}>
                         {notification.description}
                       </p>
-                      <span style={{ ...ui.mutedText, marginTop: 8 }}>
+                      <span className={`${styles.mutedText} ${styles.notificationTime}`}>
                         {formatDateTime(notification.createdAt)}
                       </span>
                     </span>
                   </button>
                 ))}
                 {notifications.length === 0 ? (
-                  <div className={styles.emptyState} style={ui.emptyState}>
+                  <div className={styles.emptyState}>
                     Nenhum aviso no momento.
                   </div>
                 ) : null}
