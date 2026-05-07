@@ -1,4 +1,6 @@
 export type SupportSettings = {
+  customerWebhookEnabled: boolean;
+  automaticBotMessagesEnabled: boolean;
   queueCriticalMinutes: number;
   staleTicketMinutes: number;
   urgentUnansweredMinutes: number;
@@ -13,6 +15,8 @@ export type SupportSettings = {
 export const supportSettingsKey = "support";
 
 export const defaultSupportSettings: SupportSettings = {
+  customerWebhookEnabled: false,
+  automaticBotMessagesEnabled: false,
   queueCriticalMinutes: 30,
   staleTicketMinutes: 20,
   urgentUnansweredMinutes: 60,

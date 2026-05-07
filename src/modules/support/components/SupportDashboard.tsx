@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 
 import type {
   SupportMessage,
@@ -691,6 +692,19 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
   );
   const canWriteToTicket =
     activeTicket?.status === "em_atendimento" && canSendToActiveCustomer;
+  const handleReplyKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!canWriteToTicket || isMutating || !message.trim()) {
+      return;
+    }
+
+    handleSendMessage();
+  };
   const assignedToLabel =
     activeTicket?.assignedTo === currentUser.id
       ? currentUser.name
@@ -828,7 +842,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
 
         {activeView === "dashboard" ? (
           <>
-            <div className={styles.filterTabs} style={ui.filterTabs} data-hub-filter-tabs>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
               <button
                 className={`${styles.filterTab} ${styles.filterTabActive}`}
                 style={{ ...ui.filterTab, ...ui.filterTabActive }}
@@ -973,7 +987,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
 
               <aside style={ui.detailsColumn}>
                 <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
+                  <header>
                     <h2 style={{ fontSize: 15 }}>Status da operação</h2>
                   </header>
                   {filters.map((item) => (
@@ -985,7 +999,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </section>
 
                 <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
+                  <header>
                     <h2 style={{ fontSize: 15 }}>Meta de primeira resposta</h2>
                   </header>
                   <div style={{ padding: 18 }}>
@@ -1031,8 +1045,61 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
             </div>
             <div style={ui.dashboardGrid}>
               <section style={ui.dashboardMain}>
+                <section style={ui.detailCard}>
+                  <header>
+                    <h2 style={{ fontSize: 15 }}>Controles de teste</h2>
+                    <Badge
+                      tone={
+                        settings.customerWebhookEnabled &&
+                        settings.automaticBotMessagesEnabled
+                          ? "success"
+                          : "danger"
+                      }
+                    >
+                      {settings.customerWebhookEnabled &&
+                      settings.automaticBotMessagesEnabled
+                        ? "Ativo"
+                        : "Pausado"}
+                    </Badge>
+                  </header>
+                  <div className={styles.testControls}>
+                    <label className={styles.switchField}>
+                      <input
+                        type="checkbox"
+                        checked={settings.customerWebhookEnabled}
+                        onChange={(event) =>
+                          handleUpdateSettings({
+                            customerWebhookEnabled: event.target.checked,
+                          })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                      />
+                      <span className={styles.switchTrack} aria-hidden="true">
+                        <span className={styles.switchThumb} />
+                      </span>
+                      <span className={styles.switchText}>Webhook e tickets</span>
+                    </label>
+                    <label className={styles.switchField}>
+                      <input
+                        type="checkbox"
+                        checked={settings.automaticBotMessagesEnabled}
+                        onChange={(event) =>
+                          handleUpdateSettings({
+                            automaticBotMessagesEnabled: event.target.checked,
+                          })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                      />
+                      <span className={styles.switchTrack} aria-hidden="true">
+                        <span className={styles.switchThumb} />
+                      </span>
+                      <span className={styles.switchText}>Respostas do bot</span>
+                    </label>
+                  </div>
+                </section>
+
                 <section style={{ ...ui.detailCard, ...ui.settingsMessagesCard }}>
-                  <header style={ui.detailHeader}>
+                  <header>
                     <h2 style={{ fontSize: 15 }}>Tempos operacionais</h2>
                     <Badge tone="neutral">minutos</Badge>
                   </header>
@@ -1116,7 +1183,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </section>
 
                 <section style={{ ...ui.detailCard, ...ui.settingsMessagesCard }}>
-                  <header style={ui.detailHeader}>
+                  <header>
                     <h2 style={{ fontSize: 15 }}>Mensagens automáticas</h2>
                   </header>
                   <div style={ui.scrollableCardBody}>
@@ -1746,27 +1813,23 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           </>
         ) : (
           <>
-            <div className={styles.filterTabs} style={ui.filterTabs} data-hub-filter-tabs>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
           {filters.map((item) => (
             <button
               key={item.value}
               className={`${styles.filterTab} ${
                 filter === item.value ? styles.filterTabActive : ""
               }`}
-              style={{
-                ...ui.filterTab,
-                ...(filter === item.value ? ui.filterTabActive : {}),
-              }}
               onClick={() => setFilter(item.value)}
             >
               {item.label}
-              <span style={ui.countPill}>{getCountForFilter(data.tickets, item.value)}</span>
+              <span>{getCountForFilter(data.tickets, item.value)}</span>
             </button>
           ))}
             </div>
 
-            <div className={styles.contentGrid} style={ui.contentGrid} data-hub-content-grid>
-          <aside className={styles.ticketColumn} style={ui.ticketColumn} data-hub-ticket-column>
+            <div className={styles.contentGrid} data-hub-content-grid>
+          <aside className={styles.ticketColumn} data-hub-ticket-column>
             {statusSections.map((section) => {
               const sectionTickets = visibleTickets.filter((ticket) =>
                 section.statuses.includes(ticket.status),
@@ -1779,41 +1842,30 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
               return (
                 <section
                   className={styles.ticketGroup}
-                  style={ui.panel}
                   data-hub-ticket-group
                   key={section.title}
                 >
-                  <h2 style={ui.groupTitle}>{section.title}</h2>
-                  <div style={ui.ticketList} data-hub-ticket-list>
+                  <h2>{section.title}</h2>
+                  <div className={styles.ticketList} data-hub-ticket-list>
                     {sectionTickets.map((ticket) => (
                       <button
                         key={ticket.id}
                         className={`${styles.ticketButton} ${
                           ticket.id === selectedTicketId ? styles.ticketButtonActive : ""
                         }`}
-                        style={{
-                          ...ui.ticketButton,
-                          ...(ticket.id === selectedTicketId ? ui.ticketButtonActive : {}),
-                        }}
                         onClick={() => handleSelectTicket(ticket.id)}
                       >
                         <div
                           className={`${styles.ticketCode} ${styles[section.tone]}`}
-                          style={{
-                            ...ui.ticketCode,
-                            ...(section.tone === "queue" ? ui.queueCode : {}),
-                            ...(section.tone === "active" ? ui.activeCode : {}),
-                            ...(section.tone === "done" ? ui.doneCode : {}),
-                          }}
                         >
                           {getTicketCode(ticket)}
                         </div>
                         <div className={styles.ticketMain}>
                           <div className={styles.ticketTop}>
                             <strong>{getTicketName(ticket)}</strong>
-                            <span style={ui.mutedText}>{formatTime(ticket.lastMessageAt)}</span>
+                            <span>{formatTime(ticket.lastMessageAt)}</span>
                           </div>
-                          <p style={ui.mutedText}>{ticket.lastMessage ?? "Sem mensagens"}</p>
+                          <p>{ticket.lastMessage ?? "Sem mensagens"}</p>
                         </div>
                         <MessageCircle className={styles.whatsIcon} size={17} />
                       </button>
@@ -1823,30 +1875,29 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
               );
             })}
             {!isLoading && visibleTickets.length === 0 ? (
-              <div className={styles.emptyState} style={ui.emptyState}>
+              <div className={styles.emptyState}>
                 Nenhum atendimento encontrado.
               </div>
             ) : null}
           </aside>
 
-          <section className={styles.chatPanel} style={ui.chatPanel} data-hub-chat-panel>
-            <header className={styles.chatHeader} style={ui.chatHeader} data-hub-chat-header>
+          <section className={styles.chatPanel} data-hub-chat-panel>
+            <header className={styles.chatHeader} data-hub-chat-header>
               {activeTicket ? (
                 <>
                   <div
                     className={`${styles.ticketCode} ${styles.queue}`}
-                    style={{ ...ui.ticketCode, ...ui.queueCode }}
                   >
                     {getTicketCode(activeTicket)}
                   </div>
                   <div className={styles.chatIdentity}>
-                    <h2 style={{ fontSize: 18 }}>{activeTicketName}</h2>
-                    <span style={ui.mutedText}>{getTicketIdentity(activeTicket)}</span>
+                    <h2>{activeTicketName}</h2>
+                    <span>{getTicketIdentity(activeTicket)}</span>
                   </div>
-                  <span className={styles.statusBadge} style={ui.statusBadge}>
+                  <span className={styles.statusBadge}>
                     {statusLabels[activeTicket.status]}
                   </span>
-                  <div className={styles.chatActions} style={ui.chatActions}>
+                  <div className={styles.chatActions}>
 	                    <button
 	                      style={mainTicketAction.style}
 	                      onClick={mainTicketAction.onClick}
@@ -1858,7 +1909,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
 	                        loadingLabel={mainTicketAction.loadingLabel}
 	                      />
 	                    </button>
-                    <button className={styles.secondaryButton} style={ui.button}>
+                    <button className={styles.secondaryButton}>
                       Mais ações
                       <ChevronDown size={15} />
                     </button>
@@ -1866,8 +1917,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </>
               ) : (
                 <div className={styles.chatIdentity}>
-                  <h2 style={{ fontSize: 18 }}>Selecione um atendimento</h2>
-                  <span style={ui.mutedText}>As mensagens aparecerão aqui</span>
+                  <h2>Selecione um atendimento</h2>
+                  <span>As mensagens aparecerão aqui</span>
                 </div>
               )}
             </header>
@@ -1875,11 +1926,10 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
             <div
               ref={messagesRef}
               className={styles.messages}
-              style={ui.messages}
               data-hub-messages
             >
               {activeTicket ? (
-                <span className={styles.dayPill} style={ui.dayPill}>Hoje</span>
+                <span className={styles.dayPill}>Hoje</span>
               ) : null}
               {data.messages.map((item) => (
                 <article
@@ -1890,78 +1940,65 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       ? styles.messageSent
                       : styles.messageReceived
                   }`}
-                  style={{
-                    ...ui.message,
-                    ...(item.direction === "enviada" ? ui.messageSent : ui.messageReceived),
-                  }}
                 >
                   <p>{item.content}</p>
-                  <span style={ui.mutedText}>
+                  <span className={styles.mutedText}>
                     {item.sentBy} · {formatTime(item.createdAt)}
                   </span>
                 </article>
               ))}
               {!activeTicket ? (
-                <div className={styles.emptyState} style={ui.emptyState}>
+                <div className={styles.emptyState}>
                   Aguardando seleção de conversa.
                 </div>
               ) : null}
             </div>
 
-            <footer className={styles.composer} style={ui.composer} data-hub-composer>
-              <div className={styles.composerTabs} style={ui.composerTabs}>
+            <footer className={styles.composer} data-hub-composer>
+              <div className={styles.composerTabs}>
                 <button
                   className={composerTab === "reply" ? styles.composerTabActive : ""}
-                  style={{
-                    ...ui.composerTab,
-                    ...(composerTab === "reply" ? ui.composerTabActive : {}),
-                  }}
                   onClick={() => setComposerTab("reply")}
                 >
                   Responder
                 </button>
                 <button
                   className={composerTab === "note" ? styles.composerTabActive : ""}
-                  style={{
-                    ...ui.composerTab,
-                    ...(composerTab === "note" ? ui.composerTabActive : {}),
-                  }}
                   onClick={() => setComposerTab("note")}
                 >
                   Comentário interno
                 </button>
               </div>
               {composerTab === "reply" ? (
-                <div className={styles.messageComposer} style={ui.messageComposer}>
+                <div className={styles.messageComposer}>
                   <textarea
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
+                    onKeyDown={handleReplyKeyDown}
                     placeholder={
                       canWriteToTicket
                         ? "Digite sua mensagem..."
                         : "Resposta indisponível neste estado"
                     }
                     disabled={!canWriteToTicket || isMutating}
-                    style={ui.textarea}
                   />
                   {composerHint ? (
-                    <p style={{ ...ui.mutedText, padding: "0 14px 10px" }}>
+                    <p className={styles.composerHint}>
                       {composerHint}
                     </p>
                   ) : null}
-                  <div className={styles.composerActions} style={ui.composerActions}>
-                    <button className={styles.iconButton} style={ui.iconButton} title="Emoji">
+                  <div className={styles.composerActions}>
+                    <button className={styles.iconButton} title="Emoji">
                       <Smile size={18} />
                     </button>
-                    <button className={styles.iconButton} style={ui.iconButton} title="Anexar">
+                    <button className={styles.iconButton} title="Anexar">
                       <Paperclip size={18} />
                     </button>
-                    <button className={styles.iconButton} style={ui.iconButton} title="Atalhos">
+                    <button className={styles.iconButton} title="Atalhos">
                       <Zap size={18} />
                     </button>
                     <button
                       className={styles.sendButton}
-                      style={{ ...ui.button, ...ui.primaryButton, ...ui.sendButton }}
                       onClick={handleSendMessage}
                       disabled={!canWriteToTicket || !message.trim() || isMutating}
                     >
@@ -1975,7 +2012,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </div>
                 </div>
               ) : (
-                <div className={styles.messageComposer} style={ui.messageComposer}>
+                <div className={styles.messageComposer}>
                   <textarea
                     value={activeTicketInternalNote}
                     onChange={(event) => {
@@ -1984,12 +2021,10 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                     }}
                     placeholder="Comentário interno"
                     disabled={!activeTicket}
-                    style={ui.textarea}
                   />
-                  <div className={styles.composerActions} style={ui.composerActions}>
+                  <div className={styles.composerActions}>
                     <button
                       className={styles.secondaryButton}
-                      style={ui.button}
                       onClick={() => {
                         setInternalNoteTicketId(activeTicket?.id ?? null);
                         setInternalNote("");
@@ -2000,7 +2035,6 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                     </button>
                     <button
                       className={styles.sendButton}
-                      style={{ ...ui.button, ...ui.primaryButton }}
                       onClick={handleSaveInternalNote}
                       disabled={!activeTicket || isMutating}
                     >
@@ -2016,53 +2050,52 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
             </footer>
           </section>
 
-          <aside className={styles.detailsColumn} style={ui.detailsColumn} data-hub-details-column>
+          <aside className={styles.detailsColumn} data-hub-details-column>
             {activeTicket ? (
               <>
-                <section className={styles.detailCard} style={ui.detailCard} data-hub-detail-card>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Detalhes do atendimento</h2>
+                <section className={styles.detailCard} data-hub-detail-card>
+                  <header>
+                    <h2>Detalhes do atendimento</h2>
                     <ChevronDown size={18} />
                   </header>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>ID do atendimento</span>
+                  <div className={styles.detailRow}>
+                    <span>ID do atendimento</span>
                     <strong>#{getTicketCode(activeTicket)}</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Status</span>
-                    <span className={styles.statusBadge} style={ui.statusBadge}>
+                  <div className={styles.detailRow}>
+                    <span>Status</span>
+                    <span className={styles.statusBadge}>
                       {statusLabels[activeTicket.status]}
                     </span>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Canal</span>
+                  <div className={styles.detailRow}>
+                    <span>Canal</span>
                     <strong>WhatsApp</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Cliente</span>
+                  <div className={styles.detailRow}>
+                    <span>Cliente</span>
                     <strong>{activeTicketName}</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Telefone</span>
+                  <div className={styles.detailRow}>
+                    <span>Telefone</span>
                     <strong>{activeTicket.customerPhone ?? "Não resolvido"}</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>LID</span>
+                  <div className={styles.detailRow}>
+                    <span>LID</span>
                     <strong>{activeTicket.customerLid ?? "-"}</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Aberto em</span>
+                  <div className={styles.detailRow}>
+                    <span>Aberto em</span>
                     <strong>{formatDateTime(activeTicket.createdAt)}</strong>
                   </div>
-                  <div className={styles.detailRow} style={ui.detailRow}>
-                    <span style={ui.mutedText}>Responsável</span>
+                  <div className={styles.detailRow}>
+                    <span>Responsável</span>
                     <strong>{assignedToLabel}</strong>
                   </div>
                   {canResolveActiveContact ? (
                     <div className={styles.detailAction}>
                       <button
                         className={styles.fullWidthButton}
-                        style={ui.button}
                         onClick={handleResolveContact}
                         disabled={isMutating}
                       >
@@ -2076,27 +2109,26 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   ) : null}
                 </section>
 
-                <section className={styles.detailCard} style={ui.detailCard} data-hub-detail-card>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Histórico do atendimento</h2>
+                <section className={styles.detailCard} data-hub-detail-card>
+                  <header>
+                    <h2>Histórico do atendimento</h2>
                   </header>
                   <div className={styles.timelineItem}>
                     <span className={styles.timelineDot} />
                     <div>
                       <strong>Atendimento criado</strong>
-                      <p style={ui.mutedText}>{formatDateTime(activeTicket.createdAt)}</p>
+                      <p>{formatDateTime(activeTicket.createdAt)}</p>
                     </div>
                   </div>
                   <div className={styles.timelineItem}>
                     <span className={styles.timelineDotMuted} />
                     <div>
                       <strong>Última atualização</strong>
-                      <p style={ui.mutedText}>{formatDateTime(activeTicket.updatedAt)}</p>
+                      <p>{formatDateTime(activeTicket.updatedAt)}</p>
                     </div>
                   </div>
                   <button
                     className={styles.finishButton}
-                    style={{ ...ui.button, width: "calc(100% - 36px)", margin: "10px 18px 0" }}
                     onClick={handleFinish}
                     disabled={isMutating || !canFinishTicket || !canSendToActiveCustomer}
                   >
@@ -2110,8 +2142,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </section>
               </>
             ) : (
-              <div className={styles.detailCard} style={ui.detailCard} data-hub-detail-card>
-                <div className={styles.emptyState} style={ui.emptyState}>
+              <div className={styles.detailCard} data-hub-detail-card>
+                <div className={styles.emptyState}>
                   Selecione um ticket.
                 </div>
               </div>

@@ -1,23 +1,23 @@
 .badge {
   width: fit-content;
-  min-height: 25px;
+  min-height: var(--hub-badge-min-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  padding: 0 10px;
-  background: #133f2d;
-  color: #22c55e;
+  border-radius: var(--hub-radius-sm);
+  padding: 0 var(--hub-space-3);
+  background: var(--hub-success-bg);
+  color: var(--hub-success);
   font-size: 12px;
   font-weight: 850;
 }
 
 .neutral {
   background: #2b3440;
-  color: #cbd5e1;
+  color: var(--hub-text-soft);
 }
 
 .danger {
-  background: #3a1518;
-  color: #fecaca;
+  background: var(--hub-danger-bg);
+  color: var(--hub-danger-text);
 }

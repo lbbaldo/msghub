@@ -185,6 +185,17 @@ const sendAttendantNotification = async (
   ticket: SupportTicket,
   message: SupportMessage,
 ): Promise<void> => {
+  const settings = await getSupportSettings();
+
+  if (!settings.automaticBotMessagesEnabled) {
+    await createAuditEvent("support_attendant_notification_skipped", {
+      reason: "automatic bot messages are disabled",
+      ticketId: ticket.id,
+      messageId: message.id,
+    });
+    return;
+  }
+
   const groupJid = getConfiguredAttendantGroupJid();
 
   if (groupJid) {
@@ -217,6 +228,12 @@ const sendCustomerQueueConfirmation = async (
   const customerPhone = getCustomerPhoneForSend(ticket);
   const settings = await getSupportSettings();
 
+  if (!settings.automaticBotMessagesEnabled) {
+    throw new Error(
+      `Cannot send queue confirmation for ticket ${ticket.id} because automatic bot messages are disabled`,
+    );
+  }
+
   const externalMessageId = await sendEvolutionTextMessage({
     phone: customerPhone,
     message: settings.openingMessage,
@@ -245,6 +262,25 @@ const sendCustomerQueueConfirmation = async (
 
     return savedMessage.message;
   });
+};
+
+const saveBotMessageIfEnabled = async (
+  ticket: SupportTicket,
+  content: string,
+  auditEvent: string,
+): Promise<SupportMessage | null> => {
+  const settings = await getSupportSettings();
+
+  if (!settings.automaticBotMessagesEnabled) {
+    await createAuditEvent(auditEvent, {
+      reason: "automatic bot messages are disabled",
+      ticketId: ticket.id,
+      contentLength: content.length,
+    });
+    return null;
+  }
+
+  return saveBotMessage(ticket, content);
 };
 
 const saveBotMessage = async (
@@ -804,6 +840,16 @@ const hasCustomerQueueConfirmation = async (
 const trySendCustomerQueueConfirmation = async (
   ticket: SupportTicket,
 ): Promise<void> => {
+  const settings = await getSupportSettings();
+
+  if (!settings.automaticBotMessagesEnabled) {
+    await createAuditEvent("support_customer_confirmation_skipped", {
+      reason: "automatic bot messages are disabled",
+      ticketId: ticket.id,
+    });
+    return;
+  }
+
   if (!canSendToCustomerPhone(ticket.customerPhone)) {
     await createAuditEvent("support_customer_confirmation_skipped", {
       reason: "customer phone is not resolved",
@@ -833,7 +879,11 @@ const processFeedbackResponse = async (
   if (!score) {
     const helpMessage = "Para avaliar o atendimento, responda apenas com uma nota de 1 a 5.";
 
-    await saveBotMessage(ticket, helpMessage);
+    await saveBotMessageIfEnabled(
+      ticket,
+      helpMessage,
+      "support_feedback_help_message_skipped",
+    );
 
     return { message: helpMessage };
   }
@@ -857,7 +907,7 @@ const processFeedbackResponse = async (
 
   const settings = await getSupportSettings();
 
-  await saveBotMessage(
+  await saveBotMessageIfEnabled(
     {
       ...ticket,
       status: "aguardando_feedback_comentario",
@@ -866,6 +916,7 @@ const processFeedbackResponse = async (
       closedAt: null,
     },
     settings.feedbackCommentPromptMessage,
+    "support_feedback_comment_prompt_skipped",
   );
 
   return { message: settings.feedbackCommentPromptMessage };
@@ -894,7 +945,7 @@ const processFeedbackComment = async (
     );
   });
 
-  await saveBotMessage(
+  await saveBotMessageIfEnabled(
     {
       ...ticket,
       status: "finalizado",
@@ -903,6 +954,7 @@ const processFeedbackComment = async (
       closedAt: inboundMessage.timestamp,
     },
     settings.feedbackThanksMessage,
+    "support_feedback_thanks_message_skipped",
   );
 
   return { message: settings.feedbackThanksMessage };
@@ -1100,7 +1152,11 @@ const processAttendantCommand = async (
 
     const settings = await getSupportSettings();
 
-    await saveBotMessage(ticket, settings.finishMessage);
+    await saveBotMessageIfEnabled(
+      ticket,
+      settings.finishMessage,
+      "support_finish_message_skipped",
+    );
 
     const response = `Atendimento #${getTicketReference(ticket.id)} finalizado. Aguardando feedback do cliente.`;
 
@@ -1287,6 +1343,17 @@ const forwardCustomerMessageToAssignedAttendant = async (
   ticket: SupportTicket,
   message: SupportMessage,
 ): Promise<void> => {
+  const settings = await getSupportSettings();
+
+  if (!settings.automaticBotMessagesEnabled) {
+    await createAuditEvent("support_customer_forward_skipped", {
+      reason: "automatic bot messages are disabled",
+      ticketId: ticket.id,
+      messageId: message.id,
+    });
+    return;
+  }
+
   if (ticket.status !== "em_atendimento") {
     return;
   }
@@ -1373,6 +1440,25 @@ export const processEvolutionInboundMessage = async (
         message: "Duplicate outgoing message ignored",
       };
     }
+  }
+
+  const settings = await getSupportSettings();
+
+  if (!settings.customerWebhookEnabled) {
+    await createAuditEvent("support_customer_webhook_message_ignored", {
+      reason: "customer webhook processing is disabled",
+      externalMessageId: inboundMessage.externalMessageId,
+      fromMe: inboundMessage.fromMe,
+      customerPhone: inboundMessage.customerPhone,
+      customerLid: inboundMessage.customerLid,
+      customerJid: inboundMessage.customerJid,
+      chatJid: inboundMessage.chatJid,
+    });
+
+    return {
+      kind: "ignored",
+      message: "Customer webhook processing is disabled",
+    };
   }
 
   const result = await withTransaction(async (client) => {
@@ -1567,7 +1653,11 @@ export const finishTicket = async (ticketId: string): Promise<SupportTicket> => 
 
   const settings = await getSupportSettings();
 
-  await saveBotMessage({ ...ticket, customerPhone: currentCustomerPhone }, settings.finishMessage);
+  await saveBotMessageIfEnabled(
+    { ...ticket, customerPhone: currentCustomerPhone },
+    settings.finishMessage,
+    "support_finish_message_skipped",
+  );
   await query(
     `
       update public.support_attendant_sessions

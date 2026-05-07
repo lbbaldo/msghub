@@ -18,6 +18,8 @@ import {
 export const runtime = "nodejs";
 
 const settingsSchema = z.object({
+  customerWebhookEnabled: z.boolean(),
+  automaticBotMessagesEnabled: z.boolean(),
   queueCriticalMinutes: z.number().int().min(1).max(240),
   staleTicketMinutes: z.number().int().min(1).max(240),
   urgentUnansweredMinutes: z.number().int().min(1).max(480),

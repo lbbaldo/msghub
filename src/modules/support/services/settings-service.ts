@@ -27,9 +27,20 @@ const normalizePositiveInteger = (
 const normalizeText = (value: unknown, fallback: string): string =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : fallback;
 
+const normalizeBoolean = (value: unknown, fallback: boolean): boolean =>
+  typeof value === "boolean" ? value : fallback;
+
 export const normalizeSupportSettings = (
   value: Partial<SupportSettings>,
 ): SupportSettings => ({
+  customerWebhookEnabled: normalizeBoolean(
+    value.customerWebhookEnabled,
+    defaultSupportSettings.customerWebhookEnabled,
+  ),
+  automaticBotMessagesEnabled: normalizeBoolean(
+    value.automaticBotMessagesEnabled,
+    defaultSupportSettings.automaticBotMessagesEnabled,
+  ),
   queueCriticalMinutes: normalizePositiveInteger(
     value.queueCriticalMinutes,
     defaultSupportSettings.queueCriticalMinutes,
