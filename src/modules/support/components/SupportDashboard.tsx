@@ -845,128 +845,134 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
             <div className={styles.filterTabs} data-hub-filter-tabs>
               <button
                 className={`${styles.filterTab} ${styles.filterTabActive}`}
-                style={{ ...ui.filterTab, ...ui.filterTabActive }}
               >
                 Hoje
               </button>
-              <button className={styles.filterTab} style={ui.filterTab}>
+              <button className={styles.filterTab}>
                 Tempo real
-                <span style={ui.countPill}>{data.tickets.length}</span>
+                <span>{data.tickets.length}</span>
               </button>
             </div>
-            <div style={ui.dashboardGrid}>
-              <section style={ui.dashboardMain}>
-                <div style={ui.dashboardMetrics}>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Em fila</span>
-                    <div style={ui.dashboardMetricValue}>
+            <div className={styles.dashboardGrid}>
+              <section className={styles.dashboardMain}>
+                <div className={styles.dashboardMetrics}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Em fila</span>
+                    <div className={styles.dashboardMetricValue}>
                       {dashboardMetrics.queueTickets.length}
                     </div>
-                    <p style={ui.mutedText}>Aguardando atendimento</p>
+                    <p className={styles.mutedText}>Aguardando atendimento</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Em atendimento</span>
-                    <div style={ui.dashboardMetricValue}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Em atendimento</span>
+                    <div className={styles.dashboardMetricValue}>
                       {dashboardMetrics.activeTickets.length}
                     </div>
-                    <p style={ui.mutedText}>Com atendente ativo</p>
+                    <p className={styles.mutedText}>Com atendente ativo</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Primeira resposta média</span>
-                    <div style={ui.dashboardMetricValue}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Primeira resposta média</span>
+                    <div className={styles.dashboardMetricValue}>
                       {formatDuration(dashboardMetrics.averageFirstResponseMs)}
                     </div>
-                    <p style={ui.mutedText}>Do ticket até a primeira resposta humana</p>
+                    <p className={styles.mutedText}>Do ticket até a primeira resposta humana</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Finalizados hoje</span>
-                    <div style={ui.dashboardMetricValue}>{dashboardMetrics.finishedToday}</div>
-                    <p style={ui.mutedText}>Atendimentos encerrados</p>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Finalizados hoje</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {dashboardMetrics.finishedToday}
+                    </div>
+                    <p className={styles.mutedText}>Atendimentos encerrados</p>
                   </article>
                 </div>
 
-                <div style={ui.dashboardMetrics}>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Resolução média</span>
-                    <div style={ui.dashboardMetricValue}>
+                <div className={styles.dashboardMetrics}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Resolução média</span>
+                    <div className={styles.dashboardMetricValue}>
                       {formatDuration(dashboardMetrics.averageResolutionMs)}
                     </div>
-                    <p style={ui.mutedText}>Da abertura até finalizar</p>
+                    <p className={styles.mutedText}>Da abertura até finalizar</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Aguardando feedback</span>
-                    <div style={ui.dashboardMetricValue}>{dashboardMetrics.waitingFeedback}</div>
-                    <p style={ui.mutedText}>Esperando nota do cliente</p>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Aguardando feedback</span>
+                    <div className={styles.dashboardMetricValue}>
+                      {dashboardMetrics.waitingFeedback}
+                    </div>
+                    <p className={styles.mutedText}>Esperando nota do cliente</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Nota média</span>
-                    <div style={ui.dashboardMetricValue}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Nota média</span>
+                    <div className={styles.dashboardMetricValue}>
                       {dashboardMetrics.averageFeedback
                         ? dashboardMetrics.averageFeedback.toFixed(1)
                         : "-"}
                     </div>
-                    <p style={ui.mutedText}>Baseada nos feedbacks recebidos</p>
+                    <p className={styles.mutedText}>Baseada nos feedbacks recebidos</p>
                   </article>
-                  <article style={ui.dashboardMetricCard}>
-                    <span style={ui.mutedText}>Pendentes</span>
-                    <div style={ui.dashboardMetricValue}>
+                  <article className={styles.dashboardMetricCard}>
+                    <span className={styles.mutedText}>Pendentes</span>
+                    <div className={styles.dashboardMetricValue}>
                       {dashboardMetrics.queueTickets.length +
                         dashboardMetrics.activeTickets.length +
                         dashboardMetrics.waitingFeedback}
                     </div>
-                    <p style={ui.mutedText}>Não finalizados</p>
+                    <p className={styles.mutedText}>Não finalizados</p>
                   </article>
                 </div>
 
-                <div style={ui.dashboardTwoColumns}>
-                  <section style={ui.detailCard}>
-                    <header style={ui.detailHeader}>
-                      <h2 style={{ fontSize: 15 }}>Fila crítica</h2>
+                <div className={styles.dashboardTwoColumns}>
+                  <section className={styles.detailCard}>
+                    <header>
+                      <h2>Fila crítica</h2>
                     </header>
                     {dashboardMetrics.criticalQueue.map(({ ticket, waitingMs }) => (
                       <button
                         key={ticket.id}
-                        style={{
-                          ...ui.ticketButton,
-                          gridTemplateColumns: "38px minmax(0, 1fr) auto",
-                        }}
+                        className={styles.dashboardListButton}
                         onClick={() => handleSelectTicket(ticket.id)}
                       >
-                        <div style={{ ...ui.ticketCode, ...ui.queueCode }}>
+                        <div className={`${styles.ticketCode} ${styles.queue}`}>
                           {getTicketCode(ticket)}
                         </div>
                         <div>
                           <strong>{getTicketName(ticket)}</strong>
-                          <p style={ui.mutedText}>{ticket.lastMessage ?? "Sem mensagens"}</p>
+                          <p className={styles.mutedText}>
+                            {ticket.lastMessage ?? "Sem mensagens"}
+                          </p>
                         </div>
-                        <span style={ui.mutedText}>
+                        <span className={styles.mutedText}>
                           {formatDuration(waitingMs)}
                         </span>
                       </button>
                     ))}
                     {dashboardMetrics.criticalQueue.length === 0 ? (
-                      <div className={styles.emptyState} style={ui.emptyState}>
+                      <div className={styles.emptyState}>
                         Nenhum atendimento aguardando na fila.
                       </div>
                     ) : null}
                   </section>
 
-                  <section style={ui.detailCard}>
-                    <header style={ui.detailHeader}>
-                      <h2 style={{ fontSize: 15 }}>Atendentes</h2>
+                  <section className={styles.detailCard}>
+                    <header>
+                      <h2>Atendentes</h2>
                     </header>
                     {dashboardMetrics.attendantRows.map((attendant) => (
-                      <div key={attendant.label} style={{ padding: "14px 18px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                          <strong>{attendant.label === currentUser.id ? currentUser.name : attendant.label}</strong>
-                          <span style={ui.mutedText}>
+                      <div key={attendant.label} className={styles.dashboardListItem}>
+                        <div className={styles.dashboardListItemHeader}>
+                          <strong>
+                            {attendant.label === currentUser.id
+                              ? currentUser.name
+                              : attendant.label}
+                          </strong>
+                          <span className={styles.mutedText}>
                             {attendant.openTickets} aberto(s) · {attendant.finishedTickets} fim
                           </span>
                         </div>
-                        <div style={{ ...ui.progressTrack, marginTop: 10 }}>
+                        <div className={`${styles.progressTrack} ${styles.progressTrackSpaced}`}>
                           <div
+                            className={styles.progressFill}
                             style={{
-                              ...ui.progressFill,
                               width: `${Math.min(
                                 100,
                                 (attendant.openTickets + attendant.finishedTickets) * 20,
@@ -977,7 +983,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       </div>
                     ))}
                     {dashboardMetrics.attendantRows.length === 0 ? (
-                      <div className={styles.emptyState} style={ui.emptyState}>
+                      <div className={styles.emptyState}>
                         Nenhum atendimento assumido ainda.
                       </div>
                     ) : null}
@@ -985,28 +991,28 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </div>
               </section>
 
-              <aside style={ui.detailsColumn}>
-                <section style={ui.detailCard}>
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
                   <header>
-                    <h2 style={{ fontSize: 15 }}>Status da operação</h2>
+                    <h2>Status da operação</h2>
                   </header>
                   {filters.map((item) => (
-                    <div key={item.value} style={ui.detailRow}>
-                      <span style={ui.mutedText}>{item.label}</span>
+                    <div key={item.value} className={styles.detailRow}>
+                      <span>{item.label}</span>
                       <strong>{getCountForFilter(data.tickets, item.value)}</strong>
                     </div>
                   ))}
                 </section>
 
-                <section style={ui.detailCard}>
+                <section className={styles.detailCard}>
                   <header>
-                    <h2 style={{ fontSize: 15 }}>Meta de primeira resposta</h2>
+                    <h2>Meta de primeira resposta</h2>
                   </header>
-                  <div style={{ padding: 18 }}>
-                    <div style={{ ...ui.progressTrack, marginBottom: 12 }}>
+                  <div className={styles.dashboardCardBody}>
+                    <div className={`${styles.progressTrack} ${styles.progressTrackWithBottom}`}>
                       <div
+                        className={styles.progressFill}
                         style={{
-                          ...ui.progressFill,
                           width:
                             dashboardMetrics.averageFirstResponseMs === null
                               ? "0%"
@@ -1024,7 +1030,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                     <strong>
                       {formatDuration(dashboardMetrics.averageFirstResponseMs)}
                     </strong>
-                    <p style={ui.mutedText}>Referência visual usando meta de 30 minutos.</p>
+                    <p className={styles.mutedText}>
+                      Referência visual usando meta de 30 minutos.
+                    </p>
                   </div>
                 </section>
               </aside>
@@ -1032,22 +1040,21 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           </>
         ) : activeView === "configuracoes" ? (
           <>
-            <div className={styles.filterTabs} style={ui.filterTabs} data-hub-filter-tabs>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
               <button
                 className={`${styles.filterTab} ${styles.filterTabActive}`}
-                style={{ ...ui.filterTab, ...ui.filterTabActive }}
               >
                 Atendimento
               </button>
-              <button className={styles.filterTab} style={ui.filterTab}>
+              <button className={styles.filterTab}>
                 Evolution
               </button>
             </div>
-            <div style={ui.dashboardGrid}>
-              <section style={ui.dashboardMain}>
-                <section style={ui.detailCard}>
+            <div className={styles.dashboardGrid}>
+              <section className={styles.dashboardMain}>
+                <section className={styles.detailCard}>
                   <header>
-                    <h2 style={{ fontSize: 15 }}>Controles de teste</h2>
+                    <h2>Controles de teste</h2>
                     <Badge
                       tone={
                         settings.customerWebhookEnabled &&
@@ -1098,14 +1105,14 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </div>
                 </section>
 
-                <section style={{ ...ui.detailCard, ...ui.settingsMessagesCard }}>
+                <section className={`${styles.detailCard} ${styles.settingsCard}`}>
                   <header>
-                    <h2 style={{ fontSize: 15 }}>Tempos operacionais</h2>
+                    <h2>Tempos operacionais</h2>
                     <Badge tone="neutral">minutos</Badge>
                   </header>
-                  <div style={ui.compactFormGrid}>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Fila crítica</span>
+                  <div className={styles.compactFormGrid}>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Fila crítica</span>
                       <TextField
                         type="number"
                         min={1}
@@ -1119,8 +1126,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         disabled={currentUser.role !== "admin" || isMutating}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Atendimento parado</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Atendimento parado</span>
                       <TextField
                         type="number"
                         min={1}
@@ -1134,8 +1141,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         disabled={currentUser.role !== "admin" || isMutating}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Urgência sem primeira resposta</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Urgência sem primeira resposta</span>
                       <TextField
                         type="number"
                         min={1}
@@ -1149,8 +1156,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         disabled={currentUser.role !== "admin" || isMutating}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Expirar feedback sem nota</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Expirar feedback sem nota</span>
                       <TextField
                         type="number"
                         min={1}
@@ -1164,8 +1171,8 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         disabled={currentUser.role !== "admin" || isMutating}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Nota baixa até</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Nota baixa até</span>
                       <TextField
                         type="number"
                         min={1}
@@ -1182,35 +1189,35 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </div>
                 </section>
 
-                <section style={{ ...ui.detailCard, ...ui.settingsMessagesCard }}>
+                <section className={`${styles.detailCard} ${styles.settingsCard}`}>
                   <header>
-                    <h2 style={{ fontSize: 15 }}>Mensagens automáticas</h2>
+                    <h2>Mensagens automáticas</h2>
                   </header>
-                  <div style={ui.scrollableCardBody}>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Abertura do atendimento</span>
+                  <div className={styles.scrollableCardBody}>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Abertura do atendimento</span>
                       <textarea
                         value={settings.openingMessage}
                         onChange={(event) =>
                           handleUpdateSettings({ openingMessage: event.target.value })
                         }
                         disabled={currentUser.role !== "admin" || isMutating}
-                        style={{ ...ui.noteBox, width: "100%" }}
+                        className={styles.noteBox}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Finalização e pedido de nota</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Finalização e pedido de nota</span>
                       <textarea
                         value={settings.finishMessage}
                         onChange={(event) =>
                           handleUpdateSettings({ finishMessage: event.target.value })
                         }
                         disabled={currentUser.role !== "admin" || isMutating}
-                        style={{ ...ui.noteBox, width: "100%" }}
+                        className={styles.noteBox}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Pedido de comentário após a nota</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Pedido de comentário após a nota</span>
                       <textarea
                         value={settings.feedbackCommentPromptMessage}
                         onChange={(event) =>
@@ -1219,11 +1226,11 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                           })
                         }
                         disabled={currentUser.role !== "admin" || isMutating}
-                        style={{ ...ui.noteBox, width: "100%" }}
+                        className={styles.noteBox}
                       />
                     </label>
-                    <label style={ui.formLabel}>
-                      <span style={ui.mutedText}>Agradecimento do feedback</span>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Agradecimento do feedback</span>
                       <textarea
                         value={settings.feedbackThanksMessage}
                         onChange={(event) =>
@@ -1232,14 +1239,14 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                           })
                         }
                         disabled={currentUser.role !== "admin" || isMutating}
-                        style={{ ...ui.noteBox, width: "100%" }}
+                        className={styles.noteBox}
                       />
                     </label>
                   </div>
-                  <footer style={ui.stickyCardFooter}>
+                  <footer className={styles.stickyCardFooter}>
                     <Button
                       variant="primary"
-                      style={ui.footerButton}
+                      className={styles.footerButton}
                       onClick={handleSaveSettings}
                       disabled={currentUser.role !== "admin" || isMutating}
                     >
@@ -1253,28 +1260,28 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                 </section>
               </section>
 
-              <aside style={ui.detailsColumn}>
-                <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Evolution API</h2>
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Evolution API</h2>
                   </header>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>URL</span>
+                  <div className={styles.detailRow}>
+                    <span>URL</span>
                     <strong>{runtimeSettings?.evolutionApiUrl ?? "-"}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Instância</span>
+                  <div className={styles.detailRow}>
+                    <span>Instância</span>
                     <strong>{runtimeSettings?.evolutionInstanceName ?? "-"}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Webhook</span>
+                  <div className={styles.detailRow}>
+                    <span>Webhook</span>
                     <Badge tone={runtimeSettings?.webhookConfigured ? "success" : "danger"}>
                       {runtimeSettings?.webhookConfigured ? "Configurado" : "Pendente"}
                     </Badge>
                   </div>
                   <Button
                     fullWidth
-                    style={{ margin: "12px 18px 0", width: "calc(100% - 36px)" }}
+                    className={styles.fullWidthButton}
                     onClick={() =>
                       window.open(
                         runtimeSettings
@@ -1290,22 +1297,22 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   </Button>
                 </section>
 
-                <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Avisos aos atendentes</h2>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Avisos aos atendentes</h2>
                   </header>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Grupo</span>
+                  <div className={styles.detailRow}>
+                    <span>Grupo</span>
                     <strong>{runtimeSettings?.attendantGroupJid ?? "Não configurado"}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Número fallback</span>
+                  <div className={styles.detailRow}>
+                    <span>Número fallback</span>
                     <strong>
                       {runtimeSettings?.attendantWhatsappNumber ?? "Não configurado"}
                     </strong>
                   </div>
                   {isSettingsLoading ? (
-                    <div className={styles.emptyState} style={ui.emptyState}>
+                    <div className={styles.emptyState}>
                       Carregando configurações...
                     </div>
                   ) : null}
@@ -1315,30 +1322,29 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           </>
         ) : activeView === "usuarios" ? (
           <>
-            <div className={styles.filterTabs} style={ui.filterTabs} data-hub-filter-tabs>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
               <button
                 className={`${styles.filterTab} ${styles.filterTabActive}`}
-                style={{ ...ui.filterTab, ...ui.filterTabActive }}
               >
                 Todos
-                <span style={ui.countPill}>{users.length}</span>
+                <span>{users.length}</span>
               </button>
-              <button className={styles.filterTab} style={ui.filterTab}>
+              <button className={styles.filterTab}>
                 Ativos
-                <span style={ui.countPill}>
+                <span>
                   {users.filter((user) => user.active).length}
                 </span>
               </button>
-              <button className={styles.filterTab} style={ui.filterTab}>
+              <button className={styles.filterTab}>
                 Sem WhatsApp
-                <span style={ui.countPill}>
+                <span>
                   {users.filter((user) => !user.whatsappPhone).length}
                 </span>
               </button>
             </div>
 
-            <div style={ui.usersGrid}>
-              <section style={ui.usersList}>
+            <div className={styles.usersGrid}>
+              <section className={styles.usersList}>
                 {visibleUsers.map((user) => {
                   const permissions = getUserPermissions(user.role);
                   const draft = userDrafts[user.id] ?? buildUserDraft(user);
@@ -1350,37 +1356,30 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                     currentUser.role === "admin" || currentUser.role === "supervisor";
 
                   return (
-                    <article key={user.id} style={ui.userManagementCard}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "44px minmax(0, 1fr) auto",
-                          gap: 12,
-                          alignItems: "center",
-                        }}
-                      >
+                    <article key={user.id} className={styles.userManagementCard}>
+                      <div className={styles.userCardHeader}>
                         <div style={{ ...ui.userAvatar, width: 44, height: 44 }}>
                           {getInitial(user.name)}
                         </div>
                         <div>
                           <h2 style={{ fontSize: 17 }}>{user.name}</h2>
-                          <p style={ui.mutedText}>{user.email}</p>
+                          <p className={styles.mutedText}>{user.email}</p>
                         </div>
                         <Badge tone={user.active ? "success" : "neutral"}>
                           {user.active ? "Ativo" : "Inativo"}
                         </Badge>
                       </div>
 
-                      <div style={{ ...ui.detailRow, padding: "14px 0 0" }}>
-                        <span style={ui.mutedText}>Perfil</span>
+                      <div className={styles.cardDetailRow}>
+                        <span className={styles.mutedText}>Perfil</span>
                         <strong>{getRoleLabel(user.role)}</strong>
                       </div>
-                      <div style={{ ...ui.detailRow, padding: "8px 0 0" }}>
-                        <span style={ui.mutedText}>WhatsApp</span>
+                      <div className={`${styles.cardDetailRow} ${styles.cardDetailRowCompact}`}>
+                        <span className={styles.mutedText}>WhatsApp</span>
                         <strong>{user.whatsappPhone ?? "Não vinculado"}</strong>
                       </div>
 
-                      <div style={{ ...ui.formGrid, marginTop: 14 }}>
+                      <div className={styles.formGrid}>
                         <TextField
                           value={draft.whatsappPhone}
                           onChange={(event) =>
@@ -1406,9 +1405,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </ToggleField>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <div className={styles.inlineActions}>
                         <Button
-                          style={{ flex: 1 }}
+                          className={styles.inlineGrow}
                           onClick={() => handleSaveUser(user)}
                           disabled={!canManageUsers || isMutating}
                         >
@@ -1428,7 +1427,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                           placeholder="Nova senha"
                           type="password"
                           disabled={!canManageUsers || isMutating}
-                          style={{ flex: 1 }}
+                          className={styles.inlineGrow}
                         />
                         <Button
                           onClick={() => handleResetUserPassword(user)}
@@ -1442,7 +1441,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </Button>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <div className={styles.inlineActions}>
                         <SelectField
                           value={draft.transferToUserId}
                           onChange={(event) =>
@@ -1451,7 +1450,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                             })
                           }
                           disabled={!canTransferTickets || isMutating}
-                          style={{ flex: 1 }}
+                          className={styles.inlineGrow}
                         >
                           <option value="">Transferir tickets para...</option>
                           {transferableUsers.map((candidateUser) => (
@@ -1476,9 +1475,9 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </Button>
                       </div>
 
-                      <div style={ui.permissionGrid}>
+                      <div className={styles.permissionGrid}>
                         {permissions.map((permission) => (
-                          <span key={permission} style={ui.permissionPill}>
+                          <span key={permission} className={styles.permissionPill}>
                             {permission}
                           </span>
                         ))}
@@ -1487,51 +1486,51 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   );
                 })}
                 {!isUsersLoading && visibleUsers.length === 0 ? (
-                  <div className={styles.emptyState} style={ui.emptyState}>
+                  <div className={styles.emptyState}>
                     Nenhum usuário encontrado.
                   </div>
                 ) : null}
                 {isUsersLoading ? (
-                  <div className={styles.emptyState} style={ui.emptyState}>
+                  <div className={styles.emptyState}>
                     Carregando usuários...
                   </div>
                 ) : null}
               </section>
 
-              <aside style={ui.detailsColumn}>
-                <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Gestão de acessos</h2>
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Gestão de acessos</h2>
                   </header>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Admins</span>
+                  <div className={styles.detailRow}>
+                    <span>Admins</span>
                     <strong>{users.filter((user) => user.role === "admin").length}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Supervisores</span>
+                  <div className={styles.detailRow}>
+                    <span>Supervisores</span>
                     <strong>
                       {users.filter((user) => user.role === "supervisor").length}
                     </strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Atendentes</span>
+                  <div className={styles.detailRow}>
+                    <span>Atendentes</span>
                     <strong>
                       {users.filter((user) => user.role === "atendente").length}
                     </strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>WhatsApp vinculado</span>
+                  <div className={styles.detailRow}>
+                    <span>WhatsApp vinculado</span>
                     <strong>
                       {users.filter((user) => Boolean(user.whatsappPhone)).length}
                     </strong>
                   </div>
                 </section>
 
-                <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Cadastrar atendente</h2>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Cadastrar atendente</h2>
                   </header>
-                  <div style={{ display: "grid", gap: 10, padding: 18 }}>
+                  <div className={styles.scrollableCardBody}>
                     <TextField
                       value={createUserForm.name}
                       onChange={(event) =>
@@ -1609,7 +1608,7 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                       />
                     </Button>
                     {currentUser.role !== "admin" ? (
-                      <p style={ui.mutedText}>
+                      <p className={styles.mutedText}>
                         Apenas admins podem cadastrar, editar, resetar senha e desativar usuários.
                       </p>
                     ) : null}
@@ -1620,37 +1619,35 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
           </>
         ) : activeView === "clientes" ? (
           <>
-            <div className={styles.filterTabs} style={ui.filterTabs} data-hub-filter-tabs>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
               <button
                 className={`${styles.filterTab} ${styles.filterTabActive}`}
-                style={{ ...ui.filterTab, ...ui.filterTabActive }}
               >
                 Todos os clientes
-                <span style={ui.countPill}>{clients.length}</span>
+                <span>{clients.length}</span>
               </button>
             </div>
 
-            <div style={ui.clientsGrid}>
-              <aside style={ui.clientList}>
+            <div className={styles.clientsGrid}>
+              <aside className={styles.clientList}>
                 {clients.map((client) => {
                   const isSelected = activeClient?.key === client.key;
 
                   return (
                     <button
                       key={client.key}
-                      style={{
-                        ...ui.clientButton,
-                        ...(isSelected ? ui.ticketButtonActive : {}),
-                      }}
+                      className={`${styles.clientButton} ${
+                        isSelected ? styles.ticketButtonActive : ""
+                      }`}
                       onClick={() => setSelectedClientKey(client.key)}
                     >
-                      <div style={{ ...ui.ticketCode, ...ui.activeCode }}>
+                      <div className={`${styles.ticketCode} ${styles.active}`}>
                         {getInitial(client.name)}
                       </div>
                       <div>
                         <strong>{client.name}</strong>
-                        <p style={ui.mutedText}>{client.identity}</p>
-                        <p style={ui.mutedText}>
+                        <p className={styles.mutedText}>{client.identity}</p>
+                        <p className={styles.mutedText}>
                           {client.openTickets} aberto(s) · {client.finishedTickets} finalizado(s)
                         </p>
                       </div>
@@ -1658,41 +1655,41 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                   );
                 })}
                 {!isLoading && clients.length === 0 ? (
-                  <div className={styles.emptyState} style={ui.emptyState}>
+                  <div className={styles.emptyState}>
                     Nenhum cliente encontrado.
                   </div>
                 ) : null}
               </aside>
 
-              <section style={ui.profilePanel}>
+              <section className={styles.profilePanel}>
                 {activeClient ? (
                   <>
-                    <header style={ui.profileHeader}>
-                      <div style={{ ...ui.ticketCode, ...ui.activeCode, width: 52, height: 52 }}>
+                    <header className={styles.profileHeader}>
+                      <div className={`${styles.ticketCode} ${styles.active} ${styles.profileAvatar}`}>
                         {getInitial(activeClient.name)}
                       </div>
                       <div>
                         <h2>{activeClient.name}</h2>
-                        <p style={ui.mutedText}>{activeClient.identity}</p>
+                        <p className={styles.mutedText}>{activeClient.identity}</p>
                       </div>
                     </header>
 
-                    <div style={ui.profileBody}>
-                      <div style={ui.metricGrid}>
-                        <div style={ui.metricCard}>
-                          <span style={ui.mutedText}>Atendimentos</span>
+                    <div className={styles.profileBody}>
+                      <div className={styles.metricGrid}>
+                        <div className={styles.metricCard}>
+                          <span className={styles.mutedText}>Atendimentos</span>
                           <h2>{activeClient.tickets.length}</h2>
                         </div>
-                        <div style={ui.metricCard}>
-                          <span style={ui.mutedText}>Em aberto</span>
+                        <div className={styles.metricCard}>
+                          <span className={styles.mutedText}>Em aberto</span>
                           <h2>{activeClient.openTickets}</h2>
                         </div>
-                        <div style={ui.metricCard}>
-                          <span style={ui.mutedText}>Finalizados</span>
+                        <div className={styles.metricCard}>
+                          <span className={styles.mutedText}>Finalizados</span>
                           <h2>{activeClient.finishedTickets}</h2>
                         </div>
-                        <div style={ui.metricCard}>
-                          <span style={ui.mutedText}>Nota média</span>
+                        <div className={styles.metricCard}>
+                          <span className={styles.mutedText}>Nota média</span>
                           <h2>
                             {activeClient.averageFeedback
                               ? activeClient.averageFeedback.toFixed(1)
@@ -1701,29 +1698,29 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </div>
                       </div>
 
-                      <section style={ui.detailCard}>
-                        <header style={ui.detailHeader}>
-                          <h2 style={{ fontSize: 15 }}>Dados do cliente</h2>
+                      <section className={styles.detailCard}>
+                        <header>
+                          <h2>Dados do cliente</h2>
                         </header>
-                        <div style={ui.detailRow}>
-                          <span style={ui.mutedText}>Telefone</span>
+                        <div className={styles.detailRow}>
+                          <span>Telefone</span>
                           <strong>{activeClient.phone ?? "Não resolvido"}</strong>
                         </div>
-                        <div style={ui.detailRow}>
-                          <span style={ui.mutedText}>LID</span>
+                        <div className={styles.detailRow}>
+                          <span>LID</span>
                           <strong>{activeClient.lid ?? "-"}</strong>
                         </div>
-                        <div style={ui.detailRow}>
-                          <span style={ui.mutedText}>Último atendimento</span>
+                        <div className={styles.detailRow}>
+                          <span>Último atendimento</span>
                           <strong>{formatDateTime(activeClient.latestTicket.updatedAt)}</strong>
                         </div>
                       </section>
 
-                      <section style={ui.detailCard}>
-                        <header style={ui.detailHeader}>
-                          <h2 style={{ fontSize: 15 }}>Observações internas</h2>
+                      <section className={styles.detailCard}>
+                        <header>
+                          <h2>Observações internas</h2>
                         </header>
-                        <div style={{ padding: 18 }}>
+                        <div className={styles.noteBody}>
                           <textarea
                             value={clientNotes[activeClient.key] ?? ""}
                             onChange={(event) =>
@@ -1733,16 +1730,10 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                               }))
                             }
                             placeholder="Adicione uma observação sobre este cliente..."
-                            style={{ ...ui.noteBox, width: "100%" }}
+                            className={styles.noteBox}
                           />
                         </div>
-                        <footer
-                          style={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            padding: "0 18px 18px",
-                          }}
-                        >
+                        <footer className={styles.noteFooter}>
                           <Button
                             variant="primary"
                             onClick={handleSaveClientNote}
@@ -1757,54 +1748,55 @@ export function SupportDashboard({ currentUser }: SupportDashboardProps) {
                         </footer>
                       </section>
 
-                      <section style={ui.detailCard}>
-                        <header style={ui.detailHeader}>
-                          <h2 style={{ fontSize: 15 }}>Histórico de atendimentos</h2>
+                      <section className={styles.detailCard}>
+                        <header>
+                          <h2>Histórico de atendimentos</h2>
                         </header>
                         {activeClient.tickets.map((ticket) => (
                           <button
                             key={ticket.id}
-                            style={{
-                              ...ui.ticketButton,
-                              gridTemplateColumns: "38px minmax(0, 1fr) auto",
-                            }}
+                            className={styles.dashboardListButton}
                             onClick={() => handleSelectClientTicket(ticket.id)}
                           >
-                            <div style={{ ...ui.ticketCode, ...ui.doneCode }}>
+                            <div className={`${styles.ticketCode} ${styles.done}`}>
                               {getTicketCode(ticket)}
                             </div>
                             <div>
                               <strong>{statusLabels[ticket.status]}</strong>
-                              <p style={ui.mutedText}>{ticket.lastMessage ?? "Sem mensagens"}</p>
+                              <p className={styles.mutedText}>
+                                {ticket.lastMessage ?? "Sem mensagens"}
+                              </p>
                             </div>
-                            <span style={ui.mutedText}>{formatDateTime(ticket.updatedAt)}</span>
+                            <span className={styles.mutedText}>
+                              {formatDateTime(ticket.updatedAt)}
+                            </span>
                           </button>
                         ))}
                       </section>
                     </div>
                   </>
                 ) : (
-                  <div className={styles.emptyState} style={ui.emptyState}>
+                  <div className={styles.emptyState}>
                     Selecione um cliente.
                   </div>
                 )}
               </section>
 
-              <aside style={ui.detailsColumn}>
-                <section style={ui.detailCard}>
-                  <header style={ui.detailHeader}>
-                    <h2 style={{ fontSize: 15 }}>Resumo</h2>
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Resumo</h2>
                   </header>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Clientes</span>
+                  <div className={styles.detailRow}>
+                    <span>Clientes</span>
                     <strong>{clients.length}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Com ticket aberto</span>
+                  <div className={styles.detailRow}>
+                    <span>Com ticket aberto</span>
                     <strong>{clients.filter((client) => client.openTickets > 0).length}</strong>
                   </div>
-                  <div style={ui.detailRow}>
-                    <span style={ui.mutedText}>Sem telefone resolvido</span>
+                  <div className={styles.detailRow}>
+                    <span>Sem telefone resolvido</span>
                     <strong>{clients.filter((client) => !client.phone).length}</strong>
                   </div>
                 </section>

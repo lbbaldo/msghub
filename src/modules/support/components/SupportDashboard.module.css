@@ -311,6 +311,340 @@
   padding-top: var(--hub-space-5);
 }
 
+.dashboardGrid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--hub-space-4);
+  padding-top: var(--hub-space-5);
+  overflow: hidden;
+}
+
+.dashboardMain {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hub-space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dashboardMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--hub-space-4);
+}
+
+.dashboardMetricCard {
+  min-height: 112px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: 16px 16px 20px;
+  background: var(--hub-panel-gradient);
+}
+
+.dashboardMetricValue {
+  margin-top: var(--hub-space-4);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.dashboardTwoColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--hub-space-4);
+}
+
+.dashboardListButton {
+  width: 100%;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: var(--hub-space-4);
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid var(--hub-border-muted);
+  padding: var(--hub-space-5) 16px;
+  background: transparent;
+  color: var(--hub-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboardListItem {
+  padding: var(--hub-space-5) var(--hub-space-6);
+}
+
+.dashboardListItemHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--hub-space-4);
+}
+
+.dashboardCardBody {
+  padding: var(--hub-space-6);
+}
+
+.settingsCard {
+  max-height: min(680px, calc(100dvh - 250px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding-bottom: 0;
+}
+
+.usersGrid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--hub-space-4);
+  padding-top: var(--hub-space-5);
+  overflow: hidden;
+}
+
+.usersList {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hub-space-4);
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.userManagementCard {
+  min-height: 176px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: 16px 16px 20px;
+  background: var(--hub-panel-gradient);
+}
+
+.userCardHeader {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: var(--hub-space-4);
+  align-items: center;
+}
+
+.cardDetailRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  gap: 16px;
+  padding-top: var(--hub-space-5);
+}
+
+.cardDetailRowCompact {
+  padding-top: var(--hub-space-2);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hub-space-3);
+  margin-top: var(--hub-space-5);
+}
+
+.inlineActions {
+  display: flex;
+  gap: var(--hub-space-2);
+  margin-top: var(--hub-space-3);
+}
+
+.inlineGrow {
+  flex: 1;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--hub-space-2);
+  margin-top: var(--hub-space-5);
+}
+
+.permissionPill {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: 0 var(--hub-space-3);
+  background: var(--hub-bg-control);
+  color: var(--hub-text-soft);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.clientsGrid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 360px minmax(460px, 1fr) 320px;
+  gap: var(--hub-space-4);
+  padding-top: var(--hub-space-5);
+  overflow: hidden;
+}
+
+.clientList {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hub-space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.clientButton {
+  width: 100%;
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: var(--hub-space-4);
+  align-items: center;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-5);
+  background: var(--hub-panel-gradient);
+  color: var(--hub-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.profilePanel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  background: var(--hub-panel-gradient);
+  overflow: hidden;
+}
+
+.profileHeader {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: var(--hub-space-5);
+  align-items: center;
+  padding: var(--hub-space-6);
+  border-bottom: 1px solid var(--hub-border);
+  background: #111a22;
+}
+
+.profileAvatar {
+  width: 52px;
+  height: 52px;
+}
+
+.profileBody {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hub-space-4);
+  padding: var(--hub-space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--hub-space-3);
+}
+
+.metricCard {
+  min-height: 72px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-4) var(--hub-space-4) 16px;
+  background: var(--hub-bg-control);
+}
+
+.noteBody {
+  padding: var(--hub-space-6);
+}
+
+.noteFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--hub-space-6) var(--hub-space-6);
+}
+
+.compactFormGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: var(--hub-space-3);
+  padding: var(--hub-space-6) var(--hub-space-6) 22px;
+}
+
+.formLabel {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.scrollableCardBody {
+  min-height: 0;
+  display: grid;
+  gap: var(--hub-space-4);
+  padding: var(--hub-space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.noteBox {
+  width: 100%;
+  min-height: 110px;
+  max-height: 160px;
+  border: 1px solid var(--hub-border);
+  border-radius: var(--hub-radius-md);
+  padding: var(--hub-space-5);
+  background: var(--hub-bg-control);
+  color: var(--hub-text);
+  outline: 0;
+  resize: vertical;
+  overflow-y: auto;
+  font: inherit;
+}
+
+.stickyCardFooter {
+  min-height: var(--hub-panel-header-min-height);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid var(--hub-border);
+  padding: var(--hub-space-5) var(--hub-space-6);
+  background: var(--hub-bg-panel);
+}
+
+.footerButton {
+  width: auto;
+  min-width: 220px;
+}
+
+.progressTrack {
+  height: 9px;
+  border-radius: var(--hub-radius-pill);
+  background: var(--hub-border-muted);
+  overflow: hidden;
+}
+
+.progressTrackSpaced {
+  margin-top: var(--hub-space-3);
+}
+
+.progressTrackWithBottom {
+  margin-bottom: var(--hub-space-4);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--hub-radius-pill);
+  background: linear-gradient(90deg, var(--hub-success), #f59e0b);
+}
+
 .ticketColumn,
 .chatPanel,
 .detailsColumn {
@@ -869,6 +1203,18 @@
     grid-template-columns: 320px minmax(360px, 1fr);
   }
 
+  .dashboardGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .usersGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .clientsGrid {
+    grid-template-columns: 320px minmax(360px, 1fr);
+  }
+
   .detailsColumn {
     display: none;
   }
@@ -916,6 +1262,14 @@
   }
 
   .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardMetrics,
+  .dashboardTwoColumns,
+  .usersList,
+  .clientsGrid,
+  .metricGrid {
     grid-template-columns: 1fr;
   }
 
