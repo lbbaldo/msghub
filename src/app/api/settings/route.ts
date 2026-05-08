@@ -27,6 +27,7 @@ const settingsSchema = z.object({
   lowFeedbackScore: z.number().int().min(1).max(5),
   openingMessage: z.string().trim().min(1).max(1000),
   finishMessage: z.string().trim().min(1).max(1000),
+  restaurantRegistrationMessage: z.string().trim().min(1).max(1000),
   feedbackCommentPromptMessage: z.string().trim().min(1).max(1000),
   feedbackThanksMessage: z.string().trim().min(1).max(1000),
 });

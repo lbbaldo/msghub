@@ -79,6 +79,10 @@ export const normalizeSupportSettings = (
     value.finishMessage,
     defaultSupportSettings.finishMessage,
   ),
+  restaurantRegistrationMessage: normalizeText(
+    value.restaurantRegistrationMessage,
+    defaultSupportSettings.restaurantRegistrationMessage,
+  ),
   feedbackCommentPromptMessage: normalizeText(
     value.feedbackCommentPromptMessage,
     defaultSupportSettings.feedbackCommentPromptMessage,

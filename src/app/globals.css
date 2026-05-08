@@ -255,11 +255,6 @@ a {
   cursor: pointer;
 }
 
-[data-hub-filter-tabs] button:first-child {
-  color: var(--hub-success);
-  border-bottom-color: var(--hub-success);
-}
-
 [data-hub-filter-tabs] span {
   min-width: 24px;
   min-height: 22px;

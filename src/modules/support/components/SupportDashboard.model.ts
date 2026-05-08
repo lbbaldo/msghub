@@ -45,6 +45,23 @@ const formatClientDisplayName = (
   name: string,
   businessName: string | null,
 ): string => (businessName ? `${name} - ${businessName}` : name);
+
+export const formatMessagePreview = (
+  content: string | null,
+  maxLength = 40,
+): string => {
+  const normalizedContent = content?.trim().replace(/\s+/g, " ");
+
+  if (!normalizedContent) {
+    return "Sem mensagens";
+  }
+
+  if (normalizedContent.length <= maxLength) {
+    return normalizedContent;
+  }
+
+  return `${normalizedContent.slice(0, maxLength).trimEnd()}...`;
+};
 export type UsersResponse = {
   users: SupportUserSummary[];
 };

@@ -37,6 +37,7 @@ import {
   formatBrazilianPhone,
   formatDateTime,
   formatDuration,
+  formatMessagePreview,
   formatTime,
   getCountForFilter,
   getInitial,
@@ -179,6 +180,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const [isFinishCategoryOpen, setIsFinishCategoryOpen] = useState(false);
   const [finishCategory, setFinishCategory] =
     useState<TicketFinishCategory>("suporte");
+  const [isTicketActionsOpen, setIsTicketActionsOpen] = useState(false);
   const [isStartConversationOpen, setIsStartConversationOpen] = useState(false);
   const [startConversationForm, setStartConversationForm] = useState({
     customerPhone: "",
@@ -190,6 +192,9 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const [settings, setSettings] = useState<SettingsView>(defaultSupportSettings);
   const [runtimeSettings, setRuntimeSettings] =
     useState<SettingsResponse["runtime"] | null>(null);
+  const [settingsSaveTarget, setSettingsSaveTarget] = useState<
+    "configuracoes" | "mensagens" | null
+  >(null);
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
   const [isClientNotesLoading, setIsClientNotesLoading] = useState(false);
   const [hasLoadedClientNotes, setHasLoadedClientNotes] = useState(false);
@@ -213,6 +218,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const [notice, setNotice] = useState<string | null>(null);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const ticketActionsMenuRef = useRef<HTMLDivElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const audioRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -362,6 +368,27 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     });
   }, [data.activeTicket?.id, data.messages.length]);
 
+  useEffect(() => {
+    if (!isTicketActionsOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        ticketActionsMenuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+
+      setIsTicketActionsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isTicketActionsOpen]);
+
   useEffect(
     () => () => {
       if (audioRecorderRef.current?.state === "recording") {
@@ -395,7 +422,10 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   }, [isUsersLoading, loadUsers, users.length]);
 
   useEffect(() => {
-    if (activeView !== "configuracoes" || runtimeSettings || isSettingsLoading) {
+    const shouldLoadSettings =
+      activeView === "configuracoes" || activeView === "mensagens";
+
+    if (!shouldLoadSettings || runtimeSettings || isSettingsLoading) {
       return;
     }
 
@@ -625,6 +655,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
   const handleSelectTicket = (ticketId: string) => {
     setIsFinishCategoryOpen(false);
+    setIsTicketActionsOpen(false);
     router.push(appViewPaths.atendimentos);
     setSelectedTicketId(ticketId);
     void loadTickets(ticketId);
@@ -632,6 +663,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
   const handleSelectClientTicket = (ticketId: string) => {
     setIsFinishCategoryOpen(false);
+    setIsTicketActionsOpen(false);
     router.push(appViewPaths.atendimentos);
     setFilter("todos");
     setSelectedTicketId(ticketId);
@@ -773,7 +805,9 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     }));
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = (target: "configuracoes" | "mensagens") => {
+    setSettingsSaveTarget(target);
+
     void runMutation(async () => {
       const response = await requestJson<SettingsResponse>("/api/settings", {
         method: "PATCH",
@@ -783,8 +817,8 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
       setSettings(response.settings);
       setRuntimeSettings(response.runtime);
-      setNotice("Configurações salvas.");
-    });
+      setNotice(target === "mensagens" ? "Mensagens salvas." : "Configurações salvas.");
+    }).finally(() => setSettingsSaveTarget(null));
   };
 
   const handleAssign = () => {
@@ -936,6 +970,24 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       );
       setMessage("");
       await loadTickets(data.activeTicket?.id);
+    });
+  };
+
+  const handleSendRestaurantRegistrationMessage = () => {
+    if (!data.activeTicket) {
+      return;
+    }
+
+    const ticketId = data.activeTicket.id;
+
+    void runMutation(async () => {
+      await requestJson<{ message: SupportMessage }>(
+        `/api/tickets/${ticketId}/restaurant-registration`,
+        { method: "POST" },
+      );
+      setIsTicketActionsOpen(false);
+      await loadTickets(ticketId);
+      setNotice("Mensagem de dados para cadastro enviada.");
     });
   };
 
@@ -2019,77 +2071,22 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                       />
                     </label>
                   </div>
-                </section>
-
-                <section className={`${styles.detailCard} ${styles.settingsCard}`}>
-                  <header>
-                    <h2>Mensagens automáticas</h2>
-                  </header>
-                  <div className={styles.scrollableCardBody}>
-                    <label className={styles.formLabel}>
-                      <span className={styles.mutedText}>Abertura do atendimento</span>
-                      <textarea
-                        value={settings.openingMessage}
-                        onChange={(event) =>
-                          handleUpdateSettings({ openingMessage: event.target.value })
-                        }
-                        disabled={currentUser.role !== "admin" || isMutating}
-                        className={styles.noteBox}
-                      />
-                    </label>
-                    <label className={styles.formLabel}>
-                      <span className={styles.mutedText}>Finalização e pedido de nota</span>
-                      <textarea
-                        value={settings.finishMessage}
-                        onChange={(event) =>
-                          handleUpdateSettings({ finishMessage: event.target.value })
-                        }
-                        disabled={currentUser.role !== "admin" || isMutating}
-                        className={styles.noteBox}
-                      />
-                    </label>
-                    <label className={styles.formLabel}>
-                      <span className={styles.mutedText}>Pedido de comentário após a nota</span>
-                      <textarea
-                        value={settings.feedbackCommentPromptMessage}
-                        onChange={(event) =>
-                          handleUpdateSettings({
-                            feedbackCommentPromptMessage: event.target.value,
-                          })
-                        }
-                        disabled={currentUser.role !== "admin" || isMutating}
-                        className={styles.noteBox}
-                      />
-                    </label>
-                    <label className={styles.formLabel}>
-                      <span className={styles.mutedText}>Agradecimento do feedback</span>
-                      <textarea
-                        value={settings.feedbackThanksMessage}
-                        onChange={(event) =>
-                          handleUpdateSettings({
-                            feedbackThanksMessage: event.target.value,
-                          })
-                        }
-                        disabled={currentUser.role !== "admin" || isMutating}
-                        className={styles.noteBox}
-                      />
-                    </label>
-                  </div>
                   <footer className={styles.stickyCardFooter}>
                     <Button
                       variant="primary"
                       className={styles.footerButton}
-                      onClick={handleSaveSettings}
+                      onClick={() => handleSaveSettings("configuracoes")}
                       disabled={currentUser.role !== "admin" || isMutating}
                     >
                       <LoadingLabel
-                        isLoading={isMutating}
+                        isLoading={settingsSaveTarget === "configuracoes"}
                         label="Salvar configurações"
                         loadingLabel="Salvando..."
                       />
                     </Button>
                   </footer>
                 </section>
+
               </section>
 
               <aside className={styles.detailsColumn}>
@@ -2667,18 +2664,121 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
             </div>
           </>
         ) : activeView === "mensagens" ? (
-          <div className={styles.dashboardGrid}>
-            <section className={styles.dashboardMain}>
-              <section className={styles.detailCard}>
-                <header>
-                  <h2>Mensagens</h2>
-                </header>
-                <div className={styles.emptyState}>
-                  Os modelos de mensagem e automações de conversa vão ficar nesta página.
-                </div>
+          <>
+            <div className={styles.filterTabs} data-hub-filter-tabs>
+              <button className={`${styles.filterTab} ${styles.filterTabActive}`}>
+                Mensagens automáticas
+              </button>
+            </div>
+
+            <div className={styles.dashboardGrid}>
+              <section className={styles.dashboardMain}>
+                <section className={`${styles.detailCard} ${styles.settingsCard}`}>
+                  <header>
+                    <h2>Modelos de mensagem</h2>
+                  </header>
+                  <div className={styles.scrollableCardBody}>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Abertura do atendimento</span>
+                      <textarea
+                        value={settings.openingMessage}
+                        onChange={(event) =>
+                          handleUpdateSettings({ openingMessage: event.target.value })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                        className={styles.noteBox}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Finalização e pedido de nota</span>
+                      <textarea
+                        value={settings.finishMessage}
+                        onChange={(event) =>
+                          handleUpdateSettings({ finishMessage: event.target.value })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                        className={styles.noteBox}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Dados para cadastro de restaurante</span>
+                      <textarea
+                        value={settings.restaurantRegistrationMessage}
+                        onChange={(event) =>
+                          handleUpdateSettings({
+                            restaurantRegistrationMessage: event.target.value,
+                          })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                        className={styles.noteBox}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Pedido de comentário após a nota</span>
+                      <textarea
+                        value={settings.feedbackCommentPromptMessage}
+                        onChange={(event) =>
+                          handleUpdateSettings({
+                            feedbackCommentPromptMessage: event.target.value,
+                          })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                        className={styles.noteBox}
+                      />
+                    </label>
+                    <label className={styles.formLabel}>
+                      <span className={styles.mutedText}>Agradecimento do feedback</span>
+                      <textarea
+                        value={settings.feedbackThanksMessage}
+                        onChange={(event) =>
+                          handleUpdateSettings({
+                            feedbackThanksMessage: event.target.value,
+                          })
+                        }
+                        disabled={currentUser.role !== "admin" || isMutating}
+                        className={styles.noteBox}
+                      />
+                    </label>
+                  </div>
+                  <footer className={styles.stickyCardFooter}>
+                    <Button
+                      variant="primary"
+                      className={styles.footerButton}
+                      onClick={() => handleSaveSettings("mensagens")}
+                      disabled={currentUser.role !== "admin" || isMutating}
+                    >
+                      <LoadingLabel
+                        isLoading={settingsSaveTarget === "mensagens"}
+                        label="Salvar mensagens"
+                        loadingLabel="Salvando..."
+                      />
+                    </Button>
+                  </footer>
+                </section>
               </section>
-            </section>
-          </div>
+
+              <aside className={styles.detailsColumn}>
+                <section className={styles.detailCard}>
+                  <header>
+                    <h2>Uso atual</h2>
+                  </header>
+                  <div className={styles.detailRow}>
+                    <span>Abertura automática</span>
+                    <strong>{settings.automaticBotMessagesEnabled ? "Ligada" : "Desligada"}</strong>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>Feedback</span>
+                    <strong>Nota e comentário</strong>
+                  </div>
+                  {isSettingsLoading ? (
+                    <div className={styles.emptyState}>
+                      Carregando mensagens...
+                    </div>
+                  ) : null}
+                </section>
+              </aside>
+            </div>
+          </>
         ) : activeView === "integracoes" ? (
           <div className={styles.dashboardGrid}>
             <section className={styles.dashboardMain}>
@@ -2698,9 +2798,8 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
               {filters.map((item) => (
                 <button
                   key={item.value}
-                  className={`${styles.filterTab} ${
-                    filter === item.value ? styles.filterTabActive : ""
-                  }`}
+                  className={styles.filterTab}
+                  data-active={filter === item.value}
                   onClick={() => setFilter(item.value)}
                 >
                   {item.label}
@@ -2753,7 +2852,9 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                             <strong>{getTicketName(ticket)}</strong>
                             <span>{formatTime(ticket.lastMessageAt)}</span>
                           </div>
-                          <p>{ticket.lastMessage ?? "Sem mensagens"}</p>
+                          <p title={ticket.lastMessage ?? undefined}>
+                            {formatMessagePreview(ticket.lastMessage)}
+                          </p>
                         </div>
                         <MessageCircle className={styles.whatsIcon} size={17} />
                       </button>
@@ -2797,10 +2898,34 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 	                        loadingLabel={mainTicketAction.loadingLabel}
 	                      />
 	                    </button>
-                    <button className={styles.secondaryButton}>
-                      Mais ações
-                      <ChevronDown size={15} />
-                    </button>
+                    <div
+                      ref={ticketActionsMenuRef}
+                      className={styles.chatActionsMenu}
+                    >
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() =>
+                          setIsTicketActionsOpen((currentValue) => !currentValue)
+                        }
+                        aria-expanded={isTicketActionsOpen}
+                        aria-haspopup="menu"
+                      >
+                        Mais opções
+                        <ChevronDown size={15} />
+                      </button>
+                      {isTicketActionsOpen ? (
+                        <div className={styles.chatActionsDropdown} role="menu">
+                          <button
+                            className={styles.chatActionsDropdownItem}
+                            onClick={handleSendRestaurantRegistrationMessage}
+                            disabled={!canWriteToTicket || isMutating}
+                            role="menuitem"
+                          >
+                            Dados para cadastro
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </>
               ) : (

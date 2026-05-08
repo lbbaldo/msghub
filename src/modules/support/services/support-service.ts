@@ -1920,6 +1920,31 @@ export const sendAttendantMessage = async ({
   });
 };
 
+export const sendRestaurantRegistrationMessage = async (
+  ticketId: string,
+): Promise<SupportMessage> => {
+  const ticketRows = await query<TicketRow>(
+    `
+      select *
+      from public.support_tickets
+      where id = $1
+      limit 1
+    `,
+    [ticketId],
+  );
+  const ticket = mapTicketRow(assertRow(ticketRows[0], "Ticket was not found"));
+
+  if (ticket.status !== "em_atendimento") {
+    throw new Error(
+      `Cannot send restaurant registration message to ticket ${ticketId} because it is ${ticket.status}`,
+    );
+  }
+
+  const settings = await getSupportSettings();
+
+  return saveBotMessage(ticket, settings.restaurantRegistrationMessage);
+};
+
 export const startConversation = async ({
   customerPhone,
   contactName,

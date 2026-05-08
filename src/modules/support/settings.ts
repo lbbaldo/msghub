@@ -8,6 +8,7 @@ export type SupportSettings = {
   lowFeedbackScore: number;
   openingMessage: string;
   finishMessage: string;
+  restaurantRegistrationMessage: string;
   feedbackCommentPromptMessage: string;
   feedbackThanksMessage: string;
 };
@@ -26,6 +27,8 @@ export const defaultSupportSettings: SupportSettings = {
     "Olá! Recebemos sua mensagem e abrimos um atendimento para você. Nossa equipe vai te responder em breve.",
   finishMessage:
     "Seu atendimento foi finalizado. Para avaliar nosso suporte, responda com uma nota de 1 a 5.",
+  restaurantRegistrationMessage:
+    "Para cadastrar seu restaurante, envie por favor: nome do estabelecimento, CNPJ, endereço completo, responsável pelo cadastro e melhor telefone para contato.",
   feedbackCommentPromptMessage:
     "Obrigado pela nota. Se quiser, deixe um comentário sobre o atendimento.",
   feedbackThanksMessage:
