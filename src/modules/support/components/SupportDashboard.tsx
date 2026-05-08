@@ -212,6 +212,11 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const [internalNoteTicketId, setInternalNoteTicketId] = useState<string | null>(null);
   const [composerTab, setComposerTab] = useState<"reply" | "note">("reply");
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [pendingAudio, setPendingAudio] = useState<{
+    blob: Blob;
+    name: string;
+    url: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -396,6 +401,15 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       }
     },
     [],
+  );
+
+  useEffect(
+    () => () => {
+      if (pendingAudio) {
+        URL.revokeObjectURL(pendingAudio.url);
+      }
+    },
+    [pendingAudio],
   );
 
   useEffect(() => {
@@ -955,7 +969,12 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const handleSendMessage = () => {
     const trimmedMessage = message.trim();
 
-    if (!data.activeTicket || !trimmedMessage) {
+    if (!data.activeTicket || (!trimmedMessage && !pendingAudio)) {
+      return;
+    }
+
+    if (pendingAudio) {
+      sendAudioBlob(pendingAudio.blob, pendingAudio.name);
       return;
     }
 
@@ -970,6 +989,36 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       );
       setMessage("");
       await loadTickets(data.activeTicket?.id);
+    });
+  };
+
+  const updatePendingAudio = (audioBlob: Blob, name: string) => {
+    if (audioBlob.size === 0) {
+      return;
+    }
+
+    const url = URL.createObjectURL(audioBlob);
+
+    setPendingAudio((currentAudio) => {
+      if (currentAudio) {
+        URL.revokeObjectURL(currentAudio.url);
+      }
+
+      return {
+        blob: audioBlob,
+        name,
+        url,
+      };
+    });
+  };
+
+  const clearPendingAudio = () => {
+    setPendingAudio((currentAudio) => {
+      if (currentAudio) {
+        URL.revokeObjectURL(currentAudio.url);
+      }
+
+      return null;
     });
   };
 
@@ -991,13 +1040,13 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     });
   };
 
-  const sendAudioBlob = (audioBlob: Blob) => {
+  const sendAudioBlob = (audioBlob: Blob, fileName: string) => {
     if (!data.activeTicket || audioBlob.size === 0) {
       return;
     }
 
     const formData = new FormData();
-    formData.append("audio", audioBlob, "atendimento-audio.webm");
+    formData.append("audio", audioBlob, fileName);
 
     void runMutation(async () => {
       await requestJson<{ message: SupportMessage }>(
@@ -1007,6 +1056,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
           body: formData,
         },
       );
+      clearPendingAudio();
       await loadTickets(data.activeTicket?.id);
     });
   };
@@ -1016,7 +1066,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       return;
     }
 
-    sendAudioBlob(audioFile);
+    updatePendingAudio(audioFile, audioFile.name || "atendimento-audio");
   };
 
   const getAudioRecorderMimeType = (): string | undefined => {
@@ -1065,7 +1115,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
           type: recorder.mimeType || "audio/webm",
         });
         audioChunksRef.current = [];
-        sendAudioBlob(audioBlob);
+        updatePendingAudio(audioBlob, "atendimento-audio.webm");
       };
       audioRecorderRef.current = recorder;
       recorder.start();
@@ -1162,7 +1212,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
     event.preventDefault();
 
-    if (!canWriteToTicket || isMutating || !message.trim()) {
+    if (!canWriteToTicket || isMutating || pendingAudio || !message.trim()) {
       return;
     }
 
@@ -1223,7 +1273,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
           label: "Finalizar atendimento",
           loadingLabel: "Finalizando...",
           onClick: handleFinish,
-          className: styles.dangerButton,
+          className: `${styles.dangerButton} ${styles.chatFinishButton}`,
         }
       : {
           disabled: isMutating || !canAssignTicket,
@@ -2903,10 +2953,12 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                       className={styles.chatActionsMenu}
                     >
                       <button
-                        className={styles.secondaryButton}
+                        className={styles.chatActionsPrimaryButton}
+                        type="button"
                         onClick={() =>
                           setIsTicketActionsOpen((currentValue) => !currentValue)
                         }
+                        data-open={isTicketActionsOpen}
                         aria-expanded={isTicketActionsOpen}
                         aria-haspopup="menu"
                       >
@@ -2917,6 +2969,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                         <div className={styles.chatActionsDropdown} role="menu">
                           <button
                             className={styles.chatActionsDropdownItem}
+                            type="button"
                             onClick={handleSendRestaurantRegistrationMessage}
                             disabled={!canWriteToTicket || isMutating}
                             role="menuitem"
@@ -3011,6 +3064,18 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                       {composerHint}
                     </p>
                   ) : null}
+                  {pendingAudio ? (
+                    <div className={styles.pendingAudioPreview}>
+                      <audio controls preload="metadata" src={pendingAudio.url} />
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={clearPendingAudio}
+                        disabled={isMutating}
+                      >
+                        Remover áudio
+                      </button>
+                    </div>
+                  ) : null}
                   <div className={styles.composerActions}>
                     <button className={styles.iconButton} title="Emoji">
                       <Smile size={18} />
@@ -3052,7 +3117,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                       aria-label="Enviar mensagem"
                       disabled={
                         !canWriteToTicket ||
-                        !message.trim() ||
+                        (!message.trim() && !pendingAudio) ||
                         isMutating ||
                         isRecordingAudio
                       }

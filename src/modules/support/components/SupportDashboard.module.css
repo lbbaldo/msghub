@@ -1058,31 +1058,60 @@
   z-index: 30;
 }
 
+.chatActionsPrimaryButton {
+  min-height: var(--hub-button-min-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hub-space-2);
+  border: 1px solid var(--hub-success-strong);
+  border-radius: var(--hub-radius-md);
+  padding: 0 var(--hub-space-5);
+  background: var(--hub-primary-gradient);
+  color: var(--hub-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chatActionsPrimaryButton svg {
+  transition: transform var(--hub-transition-fast);
+}
+
+.chatActionsPrimaryButton[data-open="true"] svg {
+  transform: rotate(180deg);
+}
+
+.chatActionsPrimaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .chatActionsDropdown {
   position: absolute;
   top: calc(100% + var(--hub-space-2));
   right: 0;
-  z-index: 25;
+  z-index: 120;
   width: max-content;
   min-width: 220px;
   border: 1px solid var(--hub-border);
   border-radius: var(--hub-radius-md);
-  background: var(--hub-panel-gradient);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+  padding: var(--hub-space-2);
+  background: var(--hub-bg-panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
 }
 
 .chatActionsDropdownItem {
   width: 100%;
-  min-height: 42px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   border: 0;
-  padding: 0 var(--hub-space-5);
+  border-radius: var(--hub-radius-sm);
+  padding: 0 var(--hub-space-3);
   background: transparent;
-  color: var(--hub-text);
+  color: var(--hub-text-soft);
   font: inherit;
-  font-weight: 800;
   text-align: left;
   cursor: pointer;
 }
@@ -1093,7 +1122,8 @@
 }
 
 .chatActionsDropdownItem:hover:not(:disabled) {
-  background: var(--hub-bg-panel-hover);
+  background: var(--hub-bg-control-hover);
+  color: var(--hub-text);
 }
 
 .primaryButton,
@@ -1126,6 +1156,32 @@
 .dangerButton {
   border-color: #dc2626;
   background: linear-gradient(180deg, var(--hub-danger), #b91c1c);
+}
+
+.chatFinishButton {
+  border-color: #f87171;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 48%, #991b1b 100%);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.24);
+}
+
+.chatActions .chatFinishButton {
+  border-color: #f87171;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 48%, #991b1b 100%);
+  color: #fff;
+}
+
+.chatFinishButton:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, #f05252 0%, #dc2626 52%, #991b1b 100%);
+  box-shadow:
+    0 0 0 3px rgba(239, 68, 68, 0.18),
+    0 12px 24px rgba(127, 29, 29, 0.24);
+}
+
+.chatActions .chatFinishButton:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, #f05252 0%, #dc2626 52%, #991b1b 100%);
 }
 
 .disabledActionButton {
@@ -1297,6 +1353,24 @@
   padding: 0 var(--hub-space-5) var(--hub-space-3);
   color: var(--hub-text-muted);
   font-size: 13px;
+}
+
+.pendingAudioPreview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--hub-space-3);
+  align-items: center;
+  padding: 0 var(--hub-space-5) var(--hub-space-3);
+}
+
+.pendingAudioPreview audio {
+  width: 100%;
+  min-width: 0;
+  max-width: 420px;
+}
+
+.pendingAudioPreview button {
+  min-height: 34px;
 }
 
 .composerActions .sendButton {
