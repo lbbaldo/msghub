@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
   }
 
   const ticketId = request.nextUrl.searchParams.get("ticketId") ?? undefined;
-  const data = await listTicketsWithMessages(ticketId);
+  const data = await listTicketsWithMessages({
+    activeTicketId: ticketId,
+    currentUser: user,
+  });
 
   return NextResponse.json(data);
 }

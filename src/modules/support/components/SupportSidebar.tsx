@@ -1,16 +1,17 @@
 import { ChevronDown, LogOut } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { CurrentUser } from "@/shared/auth/types";
 import {
   getInitial,
-  sidebarItems,
+  getSidebarItemsForRole,
   statusLabels,
   type AppView,
 } from "@/modules/support/components/SupportDashboard.model";
 import styles from "@/modules/support/components/SupportDashboard.module.css";
 import { LoadingLabel } from "@/shared/ui/LoadingLabel";
+import { useCloseOnOutsidePointerDown } from "@/shared/ui/useCloseOnOutsidePointerDown";
 
 type SupportSidebarProps = {
   activeView: AppView;
@@ -26,17 +27,26 @@ export function SupportSidebar({
   onLogout,
 }: SupportSidebarProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const closeUserMenu = useCallback(() => setIsUserMenuOpen(false), []);
+  const visibleSidebarItems = getSidebarItemsForRole(currentUser.role);
+
+  useCloseOnOutsidePointerDown({
+    containerRef: userMenuRef,
+    isOpen: isUserMenuOpen,
+    onClose: closeUserMenu,
+  });
 
   return (
     <aside className={styles.sidebar} data-hub-sidebar>
       <div className={styles.logo}>
-        aiqfome
+        aiq<span className={styles.logoAccent}>hub</span>
       </div>
       <nav
         className={styles.navigation}
         aria-label="Menu principal"
       >
-        {sidebarItems.map((item) => {
+        {visibleSidebarItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.view === activeView;
 
@@ -52,7 +62,7 @@ export function SupportSidebar({
           );
         })}
       </nav>
-      <div className={styles.sidebarUserMenu}>
+      <div ref={userMenuRef} className={styles.sidebarUserMenu}>
         {isUserMenuOpen ? (
           <div className={styles.sidebarUserDropdown}>
             <button

@@ -25,6 +25,7 @@ import {
   sendEvolutionWhatsAppAudio,
 } from "@/modules/support/services/evolution";
 import { getSupportSettings } from "@/modules/support/services/settings-service";
+import type { CurrentUser } from "@/shared/auth/types";
 import { getSupportEnv } from "@/shared/config/env";
 import { query, withTransaction } from "@/shared/lib/postgres";
 
@@ -535,18 +536,38 @@ const closeExpiredFeedbackTickets = async (): Promise<void> => {
   );
 };
 
-export const listTicketsWithMessages = async (
-  activeTicketId?: string,
-): Promise<TicketWithMessages> => {
+const getTicketVisibilityClause = (
+  currentUser: CurrentUser,
+): { whereSql: string; params: string[] } => {
+  if (currentUser.role !== "atendente") {
+    return { whereSql: "", params: [] };
+  }
+
+  return {
+    whereSql: "where status = 'em_fila' or assigned_to = $1",
+    params: [currentUser.id],
+  };
+};
+
+export const listTicketsWithMessages = async ({
+  activeTicketId,
+  currentUser,
+}: {
+  activeTicketId?: string;
+  currentUser: CurrentUser;
+}): Promise<TicketWithMessages> => {
   await markUnansweredTicketsAsUrgent();
   await closeExpiredFeedbackTickets();
+  const visibility = getTicketVisibilityClause(currentUser);
 
   const ticketRows = await query<TicketRow>(
     `
       select *
       from public.support_tickets
+      ${visibility.whereSql}
       order by updated_at desc
     `,
+    visibility.params,
   );
   const tickets = ticketRows.map(mapTicketRow);
   const contactRows = await query<ContactRow>(

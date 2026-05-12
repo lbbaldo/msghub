@@ -20,6 +20,7 @@ import type {
   SupportMessage,
   TicketCategory,
   TicketFinishCategory,
+  SupportTicket,
   TicketWithMessages,
 } from "@/modules/support/types";
 import { ticketCategories, ticketFinishCategories } from "@/modules/support/types";
@@ -27,9 +28,11 @@ import { defaultSupportSettings } from "@/modules/support/settings";
 import {
   buildClientSummaries,
   buildDashboardMetrics,
+  buildLowFeedbackFollowUps,
   buildSupportNotifications,
   buildUserDraft,
   canSendToCustomerPhone,
+  canViewAutomaticFollowUps,
   type ClientSummary,
   type ClientNoteResponse,
   type ClientNotesResponse,
@@ -46,6 +49,7 @@ import {
   getTicketIdentity,
   getTicketName,
   getUserPermissions,
+  isPendingLowFeedbackFollowUp,
   isTicketVisibleInTodayQueue,
   maskBrazilianPhoneInput,
   mergeUser,
@@ -78,6 +82,7 @@ import { Button } from "@/shared/ui/Button";
 import { DropdownField } from "@/shared/ui/DropdownField";
 import { TextField, ToggleField } from "@/shared/ui/FormField";
 import { LoadingLabel } from "@/shared/ui/LoadingLabel";
+import { useCloseOnOutsidePointerDown } from "@/shared/ui/useCloseOnOutsidePointerDown";
 
 const appViewPaths: Record<AppView, string> = {
   atendimentos: "/atendimentos",
@@ -154,6 +159,22 @@ const getReportStartDate = (period: ReportPeriod, referenceDate: Date): Date | n
   return startDate;
 };
 
+const buildLowFeedbackFollowUpDraft = (ticket: SupportTicket): string => {
+  const score = ticket.feedbackScore ?? "-";
+  const comment = ticket.feedbackComment?.trim();
+  const commentLine = comment ? ` Comentário do cliente: "${comment}"` : "";
+
+  return `Follow-up de baixa nota (${score}/5) para ${getTicketName(ticket)}.${commentLine} Próximo retorno:`;
+};
+
+const getInsightsTicketsForUser = (
+  tickets: SupportTicket[],
+  currentUser: CurrentUser,
+): SupportTicket[] =>
+  currentUser.role === "atendente"
+    ? tickets.filter((ticket) => ticket.assignedTo === currentUser.id)
+    : tickets;
+
 export function SupportDashboard({ currentUser, initialView }: SupportDashboardProps) {
   const router = useRouter();
   const [data, setData] = useState<TicketWithMessages>({
@@ -196,6 +217,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     "configuracoes" | "mensagens" | null
   >(null);
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
   const [isClientNotesLoading, setIsClientNotesLoading] = useState(false);
   const [hasLoadedClientNotes, setHasLoadedClientNotes] = useState(false);
   const [userDrafts, setUserDrafts] = useState<Record<string, UserDraft>>({});
@@ -311,6 +333,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       const response = await requestJson<SettingsResponse>("/api/settings");
       setSettings(response.settings);
       setRuntimeSettings(response.runtime);
+      setHasLoadedSettings(true);
     } catch (caughtError) {
       const nextError =
         caughtError instanceof Error ? caughtError.message : "Erro ao carregar configurações";
@@ -373,26 +396,13 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     });
   }, [data.activeTicket?.id, data.messages.length]);
 
-  useEffect(() => {
-    if (!isTicketActionsOpen) {
-      return;
-    }
+  const closeTicketActionsMenu = useCallback(() => setIsTicketActionsOpen(false), []);
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        ticketActionsMenuRef.current?.contains(event.target)
-      ) {
-        return;
-      }
-
-      setIsTicketActionsOpen(false);
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isTicketActionsOpen]);
+  useCloseOnOutsidePointerDown({
+    containerRef: ticketActionsMenuRef,
+    isOpen: isTicketActionsOpen,
+    onClose: closeTicketActionsMenu,
+  });
 
   useEffect(
     () => () => {
@@ -414,7 +424,8 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
   useEffect(() => {
     const shouldLoadUsers =
-      activeView === "usuarios" || activeView === "relatorios";
+      currentUser.role !== "atendente" &&
+      (activeView === "usuarios" || activeView === "relatorios");
 
     if (!shouldLoadUsers || users.length > 0 || isUsersLoading) {
       return;
@@ -423,30 +434,30 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     queueMicrotask(() => {
       void loadUsers();
     });
-  }, [activeView, isUsersLoading, loadUsers, users.length]);
+  }, [activeView, currentUser.role, isUsersLoading, loadUsers, users.length]);
 
   useEffect(() => {
-    if (users.length > 0 || isUsersLoading) {
+    if (currentUser.role === "atendente" || users.length > 0 || isUsersLoading) {
       return;
     }
 
     queueMicrotask(() => {
       void loadUsers();
     });
-  }, [isUsersLoading, loadUsers, users.length]);
+  }, [currentUser.role, isUsersLoading, loadUsers, users.length]);
 
   useEffect(() => {
     const shouldLoadSettings =
       activeView === "configuracoes" || activeView === "mensagens";
 
-    if (!shouldLoadSettings || runtimeSettings || isSettingsLoading) {
+    if (!shouldLoadSettings || hasLoadedSettings || isSettingsLoading) {
       return;
     }
 
     queueMicrotask(() => {
       void loadSettings();
     });
-  }, [activeView, isSettingsLoading, loadSettings, runtimeSettings]);
+  }, [activeView, hasLoadedSettings, isSettingsLoading, loadSettings]);
 
   useEffect(() => {
     if (activeView !== "clientes" || hasLoadedClientNotes || isClientNotesLoading) {
@@ -518,13 +529,26 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
   const activeClient =
     clients.find((client) => client.key === selectedClientKey) ?? clients[0] ?? null;
+  const insightsTickets = useMemo(
+    () => getInsightsTicketsForUser(data.tickets, currentUser),
+    [currentUser, data.tickets],
+  );
+  const insightsTicketsInTodayQueue = useMemo(
+    () => insightsTickets.filter((ticket) => isTicketVisibleInTodayQueue(ticket)),
+    [insightsTickets],
+  );
   const dashboardMetrics = useMemo(
-    () => buildDashboardMetrics(data.tickets),
-    [data.tickets],
+    () => buildDashboardMetrics(insightsTickets),
+    [insightsTickets],
+  );
+  const canViewFollowUps = canViewAutomaticFollowUps(currentUser.role);
+  const lowFeedbackFollowUps = useMemo(
+    () => (canViewFollowUps ? buildLowFeedbackFollowUps(data.tickets, settings) : []),
+    [canViewFollowUps, data.tickets, settings],
   );
   const notifications = useMemo(
-    () => buildSupportNotifications(data.tickets, settings),
-    [data.tickets, settings],
+    () => buildSupportNotifications(data.tickets, settings, currentUser.role),
+    [currentUser.role, data.tickets, settings],
   );
   const visibleUsers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -553,7 +577,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
   const reportAttendantOptions = useMemo(
     () =>
       Array.from(
-        data.tickets.reduce<Set<string>>((attendantIds, ticket) => {
+        insightsTickets.reduce<Set<string>>((attendantIds, ticket) => {
           if (!ticket.assignedTo) {
             return attendantIds;
           }
@@ -563,18 +587,21 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
       )
         .map((attendantId) => ({
           id: attendantId,
-          label: userNameById.get(attendantId) ?? attendantId,
+          label:
+            attendantId === currentUser.id
+              ? currentUser.name
+              : userNameById.get(attendantId) ?? attendantId,
         }))
         .sort((firstAttendant, secondAttendant) =>
           firstAttendant.label.localeCompare(secondAttendant.label),
         ),
-    [data.tickets, userNameById],
+    [currentUser.id, currentUser.name, insightsTickets, userNameById],
   );
   const reportTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const startDate = getReportStartDate(reportPeriod, new Date());
 
-    return data.tickets
+    return insightsTickets
       .filter((ticket) => {
         const activityDate = new Date(ticket.updatedAt);
         const matchesPeriod = startDate ? activityDate >= startDate : true;
@@ -613,7 +640,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
           new Date(firstTicket.updatedAt).getTime(),
       );
   }, [
-    data.tickets,
+    insightsTickets,
     query,
     reportAttendantId,
     reportCategory,
@@ -1194,6 +1221,28 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
     activeTicket && internalNoteTicketId === activeTicket.id
       ? internalNote
       : activeTicket?.internalNote ?? "";
+  const activeTicketNeedsFollowUp =
+    Boolean(activeTicket) &&
+    canViewFollowUps &&
+    isPendingLowFeedbackFollowUp(activeTicket as SupportTicket, settings);
+  const handlePrepareActiveFollowUp = () => {
+    if (!activeTicket) {
+      return;
+    }
+
+    setComposerTab("note");
+    setInternalNoteTicketId(activeTicket.id);
+    setInternalNote((currentNote) => {
+      const currentContent =
+        internalNoteTicketId === activeTicket.id
+          ? currentNote
+          : activeTicket.internalNote ?? "";
+
+      return currentContent.trim()
+        ? currentContent
+        : buildLowFeedbackFollowUpDraft(activeTicket);
+    });
+  };
   const activeTicketName = activeTicket ? getTicketName(activeTicket) : "";
   const canSendToActiveCustomer = activeTicket
     ? canSendToCustomerPhone(activeTicket.customerPhone)
@@ -1592,7 +1641,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
               </button>
               <button className={styles.filterTab}>
                 Tempo real
-                <span>{ticketsInTodayQueue.length}</span>
+                <span>{insightsTicketsInTodayQueue.length}</span>
               </button>
             </div>
             <div className={styles.dashboardGrid}>
@@ -1697,13 +1746,19 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
 
                   <section className={styles.detailCard}>
                     <header>
-                      <h2>Atendentes</h2>
+                      <h2>
+                        {currentUser.role === "atendente"
+                          ? "Meu desempenho"
+                          : "Atendentes"}
+                      </h2>
                     </header>
                     {dashboardMetrics.attendantRows.map((attendant) => (
                       <div key={attendant.label} className={styles.dashboardListItem}>
                         <div className={styles.dashboardListItemHeader}>
                           <strong>
-                            {attendant.label === currentUser.id
+                            {currentUser.role === "atendente"
+                              ? "Você"
+                              : attendant.label === currentUser.id
                               ? currentUser.name
                               : attendant.label}
                           </strong>
@@ -1726,7 +1781,9 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                     ))}
                     {dashboardMetrics.attendantRows.length === 0 ? (
                       <div className={styles.emptyState}>
-                        Nenhum atendimento assumido ainda.
+                        {currentUser.role === "atendente"
+                          ? "Você ainda não tem atendimentos assumidos nesse período."
+                          : "Nenhum atendimento assumido ainda."}
                       </div>
                     ) : null}
                   </section>
@@ -1734,6 +1791,42 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
               </section>
 
               <aside className={styles.detailsColumn}>
+                {canViewFollowUps ? (
+                  <section className={styles.detailCard}>
+                    <header>
+                      <h2>Follow-ups automáticos</h2>
+                      <Badge tone={lowFeedbackFollowUps.length > 0 ? "danger" : "neutral"}>
+                        {lowFeedbackFollowUps.length}
+                      </Badge>
+                    </header>
+                    {lowFeedbackFollowUps.slice(0, 5).map(({ ticket, score }) => (
+                      <button
+                        key={ticket.id}
+                        className={styles.dashboardListButton}
+                        onClick={() => handleSelectTicket(ticket.id)}
+                      >
+                        <div className={`${styles.ticketCode} ${styles.done}`}>
+                          {score}
+                        </div>
+                        <div>
+                          <strong>{getTicketName(ticket)}</strong>
+                          <p className={styles.mutedText}>
+                            {ticket.feedbackComment?.trim() || "Sem comentário do cliente"}
+                          </p>
+                        </div>
+                        <span className={styles.mutedText}>
+                          {formatDateTime(ticket.feedbackReceivedAt)}
+                        </span>
+                      </button>
+                    ))}
+                    {lowFeedbackFollowUps.length === 0 ? (
+                      <div className={styles.emptyState}>
+                        Nenhum follow-up de baixa nota pendente.
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+
                 <section className={styles.detailCard}>
                   <header>
                     <h2>Status da operação</h2>
@@ -1741,7 +1834,9 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                   {filters.map((item) => (
                     <div key={item.value} className={styles.detailRow}>
                       <span>{item.label}</span>
-                      <strong>{getCountForFilter(ticketsInTodayQueue, item.value)}</strong>
+                      <strong>
+                        {getCountForFilter(insightsTicketsInTodayQueue, item.value)}
+                      </strong>
                     </div>
                   ))}
                 </section>
@@ -2191,7 +2286,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                       {runtimeSettings?.attendantWhatsappNumber ?? "Não configurado"}
                     </strong>
                   </div>
-                  {isSettingsLoading ? (
+                  {isSettingsLoading && !hasLoadedSettings ? (
                     <div className={styles.emptyState}>
                       Carregando configurações...
                     </div>
@@ -2820,7 +2915,7 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                     <span>Feedback</span>
                     <strong>Nota e comentário</strong>
                   </div>
-                  {isSettingsLoading ? (
+                  {isSettingsLoading && !hasLoadedSettings ? (
                     <div className={styles.emptyState}>
                       Carregando mensagens...
                     </div>
@@ -3229,6 +3324,39 @@ export function SupportDashboard({ currentUser, initialView }: SupportDashboardP
                     </div>
                   ) : null}
                 </section>
+
+                {activeTicketNeedsFollowUp ? (
+                  <section className={styles.detailCard} data-hub-detail-card>
+                    <header>
+                      <h2>Follow-up automático</h2>
+                      <Badge tone="danger">
+                        Nota {activeTicket.feedbackScore}
+                      </Badge>
+                    </header>
+                    <div className={styles.followUpBody}>
+                      <p>
+                        Este atendimento entrou para acompanhamento porque a nota ficou
+                        dentro do limite de baixa avaliação.
+                      </p>
+                      {activeTicket.feedbackComment ? (
+                        <blockquote>{activeTicket.feedbackComment}</blockquote>
+                      ) : (
+                        <p className={styles.mutedText}>
+                          O cliente ainda não deixou comentário complementar.
+                        </p>
+                      )}
+                    </div>
+                    <div className={styles.detailAction}>
+                      <button
+                        className={styles.fullWidthButton}
+                        onClick={handlePrepareActiveFollowUp}
+                        disabled={isMutating}
+                      >
+                        Preparar comentário interno
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
 
                 <section className={styles.detailCard} data-hub-detail-card>
                   <header>

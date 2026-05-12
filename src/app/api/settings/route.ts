@@ -10,10 +10,10 @@ import { getEvolutionEnv, getSupportEnv, getWebhookEnv } from "@/shared/config/e
 import {
   assertAdmin,
   assertSameOrigin,
-  assertSupervisorOrAdmin,
   consumeAdminRateLimit,
   createSecurityAuditEvent,
 } from "@/shared/security/admin-actions";
+import type { CurrentUser } from "@/shared/auth/types";
 
 export const runtime = "nodejs";
 
@@ -46,6 +46,9 @@ const getRuntimeSettings = () => {
   };
 };
 
+const canViewRuntimeSettings = (user: CurrentUser): boolean =>
+  user.role === "admin" || user.role === "supervisor";
+
 export async function GET() {
   const user = await getCurrentUser();
 
@@ -53,17 +56,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    assertSupervisorOrAdmin(user);
-  } catch {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const settings = await getSupportSettings();
 
   return NextResponse.json({
     settings,
-    runtime: getRuntimeSettings(),
+    runtime: canViewRuntimeSettings(user) ? getRuntimeSettings() : null,
   });
 }
 

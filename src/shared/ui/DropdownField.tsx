@@ -1,10 +1,11 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import type { FocusEvent } from "react";
 
 import styles from "@/shared/ui/DropdownField.module.css";
+import { useCloseOnOutsidePointerDown } from "@/shared/ui/useCloseOnOutsidePointerDown";
 
 export type DropdownOption<TValue extends string> = {
   label: string;
@@ -30,8 +31,16 @@ export function DropdownField<TValue extends string>({
   value,
 }: DropdownFieldProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const listboxId = useId();
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
+  const closeDropdown = useCallback(() => setIsOpen(false), []);
+
+  useCloseOnOutsidePointerDown({
+    containerRef: dropdownRef,
+    isOpen,
+    onClose: closeDropdown,
+  });
 
   const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -40,7 +49,11 @@ export function DropdownField<TValue extends string>({
   };
 
   return (
-    <div className={joinClassNames(styles.dropdown, className)} onBlur={handleBlur}>
+    <div
+      ref={dropdownRef}
+      className={joinClassNames(styles.dropdown, className)}
+      onBlur={handleBlur}
+    >
       <button
         type="button"
         className={styles.trigger}

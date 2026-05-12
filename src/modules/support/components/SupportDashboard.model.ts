@@ -82,7 +82,7 @@ export type SettingsResponse = {
     webhookConfigured: boolean;
     attendantWhatsappNumber: string | null;
     attendantGroupJid: string | null;
-  };
+  } | null;
 };
 
 export type ClientNotesResponse = {
@@ -115,6 +115,12 @@ export type SupportNotification = {
   createdAt: string | null;
   ticketId: string | null;
   tone: "danger" | "warning" | "info";
+};
+
+export type LowFeedbackFollowUp = {
+  ticket: SupportTicket;
+  score: number;
+  createdAt: string | null;
 };
 
 export type DashboardMetrics = {
@@ -166,6 +172,22 @@ export const sidebarItems: Array<{
   { label: "Usuários", icon: Users, view: "usuarios", href: "/usuarios" },
   { label: "Integrações", icon: Zap, view: "integracoes", href: "/integracoes" },
 ];
+
+const attendantRestrictedViews = new Set<AppView>([
+  "usuarios",
+  "configuracoes",
+]);
+
+export const canAccessAppView = (
+  role: CurrentUser["role"],
+  view: AppView,
+): boolean =>
+  role === "atendente" ? !attendantRestrictedViews.has(view) : true;
+
+export const getSidebarItemsForRole = (
+  role: CurrentUser["role"],
+): typeof sidebarItems =>
+  sidebarItems.filter((item) => canAccessAppView(role, item.view));
 
 export const statusLabels: Record<TicketStatus, string> = {
   em_fila: "Em fila",
@@ -354,6 +376,7 @@ export const buildDashboardMetrics = (tickets: SupportTicket[]): DashboardMetric
 export const buildSupportNotifications = (
   tickets: SupportTicket[],
   settings: SupportSettings,
+  currentUserRole: CurrentUser["role"],
 ): SupportNotification[] => {
   const now = new Date();
   const urgentNotifications = tickets
@@ -434,19 +457,16 @@ export const buildSupportNotifications = (
       ticketId: ticket.id,
       tone: "info",
     }) satisfies SupportNotification);
-  const lowFeedbackNotifications = tickets
-    .filter(
-      (ticket) =>
-        ticket.feedbackScore !== null && ticket.feedbackScore <= settings.lowFeedbackScore,
-    )
-    .map((ticket) => ({
-      id: `low-feedback-${ticket.id}`,
-      title: "Avaliação baixa",
-      description: `${getTicketName(ticket)} avaliou com nota ${ticket.feedbackScore}.`,
-      createdAt: ticket.feedbackReceivedAt,
-      ticketId: ticket.id,
-      tone: "danger",
-    }) satisfies SupportNotification);
+  const lowFeedbackNotifications = canViewAutomaticFollowUps(currentUserRole)
+    ? buildLowFeedbackFollowUps(tickets, settings).map(({ ticket, score, createdAt }) => ({
+        id: `low-feedback-${ticket.id}`,
+        title: "Follow-up automático",
+        description: `${getTicketName(ticket)} precisa de retorno após nota ${score}.`,
+        createdAt,
+        ticketId: ticket.id,
+        tone: "danger",
+      }) satisfies SupportNotification)
+    : [];
   const unresolvedIdentityNotifications = tickets
     .filter((ticket) => ticket.status !== "finalizado" && !ticket.customerPhone)
     .map((ticket) => ({
@@ -473,6 +493,49 @@ export const buildSupportNotifications = (
     )
     .slice(0, 12);
 };
+
+export const canViewAutomaticFollowUps = (role: CurrentUser["role"]): boolean =>
+  role === "admin" || role === "supervisor";
+
+export const isLowFeedbackTicket = (
+  ticket: SupportTicket,
+  settings: SupportSettings,
+): boolean =>
+  ticket.feedbackScore !== null && ticket.feedbackScore <= settings.lowFeedbackScore;
+
+export const hasRecordedLowFeedbackFollowUp = (ticket: SupportTicket): boolean => {
+  if (!ticket.feedbackReceivedAt || !ticket.internalNoteUpdatedAt) {
+    return false;
+  }
+
+  return (
+    new Date(ticket.internalNoteUpdatedAt).getTime() >=
+    new Date(ticket.feedbackReceivedAt).getTime()
+  );
+};
+
+export const isPendingLowFeedbackFollowUp = (
+  ticket: SupportTicket,
+  settings: SupportSettings,
+): boolean =>
+  isLowFeedbackTicket(ticket, settings) && !hasRecordedLowFeedbackFollowUp(ticket);
+
+export const buildLowFeedbackFollowUps = (
+  tickets: SupportTicket[],
+  settings: SupportSettings,
+): LowFeedbackFollowUp[] =>
+  tickets
+    .filter((ticket) => isPendingLowFeedbackFollowUp(ticket, settings))
+    .map((ticket) => ({
+      ticket,
+      score: ticket.feedbackScore as number,
+      createdAt: ticket.feedbackReceivedAt,
+    }))
+    .sort(
+      (firstFollowUp, secondFollowUp) =>
+        new Date(secondFollowUp.createdAt ?? 0).getTime() -
+        new Date(firstFollowUp.createdAt ?? 0).getTime(),
+    );
 
 export const getRoleLabel = (role: CurrentUser["role"]): string => {
   const labels: Record<CurrentUser["role"], string> = {
